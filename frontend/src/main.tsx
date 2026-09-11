@@ -21,14 +21,14 @@ import "prismjs/themes/prism-tomorrow.css";
 import "./styles.css";
 
 export const NOTE_THEMES: { id: NoteTheme; name: string; hex: string }[] = [
-  { id: "violet", name: "Royal Violet", hex: "#7922a9" },
-  { id: "cobalt", name: "Ocean Cobalt", hex: "#1d4ed8" },
-  { id: "emerald", name: "Emerald Mint", hex: "#059669" },
-  { id: "ruby", name: "Ruby Crimson", hex: "#e11d48" },
-  { id: "amber", name: "Sunset Amber", hex: "#d97706" },
-  { id: "teal", name: "Dark Teal", hex: "#087b77" },
-  { id: "coral", name: "Warm Coral", hex: "#ea580c" },
-  { id: "indigo", name: "Deep Indigo", hex: "#3456b8" },
+  { id: "violet", name: "Royal Violet", hex: "#6a1b9a" },
+  { id: "cobalt", name: "Slate Navy", hex: "#1e3a8a" },
+  { id: "emerald", name: "Forest Spruce", hex: "#14532d" },
+  { id: "ruby", name: "Burgundy Wine", hex: "#881337" },
+  { id: "amber", name: "Dark Bronze", hex: "#78350f" },
+  { id: "teal", name: "Nordic Pine", hex: "#134e4a" },
+  { id: "coral", name: "Warm Terracotta", hex: "#7c2d12" },
+  { id: "indigo", name: "Charcoal Slate", hex: "#334155" },
 ];
 
 function pickNextTheme(lastTheme?: NoteTheme): NoteTheme {
@@ -601,6 +601,22 @@ function Reader({
           <h1>{note.title}</h1>
         </div>
 
+        <div className="palette-picker" title="Document Color Palette">
+          <span className="palette-label">Palette</span>
+          <div className="palette-dots">
+            {NOTE_THEMES.map((t) => (
+              <button
+                key={t.id}
+                className={activeTheme === t.id ? "palette-dot active" : "palette-dot"}
+                style={{ backgroundColor: t.hex }}
+                title={t.name}
+                aria-label={t.name}
+                onClick={() => onUpdateTheme(t.id)}
+              />
+            ))}
+          </div>
+        </div>
+
         <button className="export-pdf-btn" onClick={print} title="Export as PDF / Print">
           <Download size={15} /> Export PDF
         </button>
@@ -740,25 +756,26 @@ function SafeNotes({
       });
 
       try {
+        const primaryColor = getComputedStyle(root).getPropertyValue("--note-primary").trim() || "#6a1b9a";
         const mermaid = (await import("mermaid")).default;
         mermaid.initialize({
           startOnLoad: false,
           securityLevel: "loose",
           theme: "base",
           themeVariables: {
-            fontFamily: "Manrope, sans-serif",
+            fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif",
             fontSize: "12px",
             primaryColor: "#ffffff",
-            primaryBorderColor: "#7922a9",
-            primaryTextColor: "#202322",
-            lineColor: "#94a3b8",
+            primaryBorderColor: primaryColor,
+            primaryTextColor: "#23272f",
+            lineColor: "#555555",
             secondaryColor: "#ffffff",
             tertiaryColor: "#ffffff",
             background: "transparent",
             mainBkg: "#ffffff",
-            nodeBorder: "#7922a9",
+            nodeBorder: primaryColor,
             clusterBkg: "transparent",
-            clusterBorder: "#d4cec4",
+            clusterBorder: "#d1a3e0",
           },
         });
         const { svg } = await mermaid.render(`diagram-${index}-${Date.now()}`, cleaned);
