@@ -1,0 +1,31 @@
+{
+  "name": "lecture-notes-ai-extension",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "start": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "dompurify": "^3.4.15",
+    "katex": "^0.18.7",
+    "lucide-react": "latest",
+    "mermaid": "^12.0.0",
+    "prismjs": "^1.30.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@types/chrome": "latest",
+    "@types/dompurify": "^3.0.5",
+    "@types/katex": "^0.16.8",
+    "@types/prismjs": "^1.26.6",
+    "@types/react": "latest",
+    "@types/react-dom": "latest"
+  }
+}
