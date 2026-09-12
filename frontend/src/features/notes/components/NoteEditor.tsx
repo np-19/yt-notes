@@ -229,16 +229,29 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         console.warn('Mermaid initialization error:', e);
       }
 
-      // 5. Force center on all flow diagrams
+      // 5. Force center on all mermaid SVGs & flow diagrams
       try {
+        const allSvgs = containerRef.current.querySelectorAll('.mermaid svg, svg.flowchart, [id^="mermaid-svg"]');
+        allSvgs.forEach((svg) => {
+          const svgEl = svg as SVGElement;
+          svgEl.style.setProperty('margin', '0 auto', 'important');
+          svgEl.style.setProperty('display', 'block', 'important');
+          if (svgEl.parentElement) {
+            svgEl.parentElement.style.setProperty('text-align', 'center', 'important');
+            svgEl.parentElement.style.setProperty('display', 'flex', 'important');
+            svgEl.parentElement.style.setProperty('justify-content', 'center', 'important');
+            svgEl.parentElement.style.setProperty('margin', '20px auto', 'important');
+          }
+        });
+
         const flowDiagrams = containerRef.current.querySelectorAll('.flow-diagram');
         flowDiagrams.forEach((fd) => {
           const el = fd as HTMLElement;
-          el.style.display = 'flex';
-          el.style.justifyContent = 'center';
-          el.style.alignItems = 'center';
-          el.style.margin = '20px auto';
-          el.style.width = '100%';
+          el.style.setProperty('display', 'flex', 'important');
+          el.style.setProperty('justify-content', 'center', 'important');
+          el.style.setProperty('align-items', 'center', 'important');
+          el.style.setProperty('margin', '20px auto', 'important');
+          el.style.setProperty('width', '100%', 'important');
         });
       } catch (e) {}
     }
