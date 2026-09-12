@@ -1,4 +1,4 @@
-import { executeWithModelFallback, FAST_LOW_COST_MODELS } from "./gemini.service.js";
+import { executeWithModelFallback } from "./gemini.service.js";
 
 export type TranscriptEntry = {
   text: string;
@@ -14,9 +14,7 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<{
   transcript: TranscriptEntry[];
   hasSubtitles: boolean;
 }> {
-  return executeWithModelFallback(
-    "getVideoDetailsAndTranscript",
-    async (model) => {
+  return executeWithModelFallback("getVideoDetailsAndTranscript", async (model) => {
     const prompt = `You are a YouTube video transcription and metadata extraction engine.
 YouTube Video ID: "${videoId}"
 
@@ -41,12 +39,14 @@ Provide 20-30 chronological transcript segments. Output ONLY raw JSON.`;
     const data = JSON.parse(jsonText);
 
     const transcript: TranscriptEntry[] = Array.isArray(data?.transcript)
-      ? data.transcript.map((item: any, idx: number) => ({
-          text: String(item.text || ""),
-          offset: Number(item.offset ?? idx * 5000),
-          duration: Number(item.duration ?? 5000),
-          lang: String(item.lang || "en"),
-        })).filter((e: TranscriptEntry) => Boolean(e.text))
+      ? data.transcript
+          .map((item: any, idx: number) => ({
+            text: String(item.text || ""),
+            offset: Number(item.offset ?? idx * 5000),
+            duration: Number(item.duration ?? 5000),
+            lang: String(item.lang || "en"),
+          }))
+          .filter((e: TranscriptEntry) => Boolean(e.text))
       : [];
 
     return {
@@ -56,5 +56,5 @@ Provide 20-30 chronological transcript segments. Output ONLY raw JSON.`;
       transcript,
       hasSubtitles: transcript.length > 0,
     };
-  }, FAST_LOW_COST_MODELS);
+  });
 }
