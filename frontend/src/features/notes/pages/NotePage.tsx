@@ -84,12 +84,16 @@ export const NotePage: React.FC = () => {
 
         await notesApi.saveNote(finalNote);
         sessionStorage.removeItem(`pending_note_gen_${noteId}`);
+        localStorage.removeItem(`pending_note_gen_${noteId}`);
         setActiveDocument(finalNote);
         setIsStreaming(false);
+        navigate(`/notes/${noteId}`, { replace: true });
       },
       (err) => {
         setStreamError(err);
         setIsStreaming(false);
+        sessionStorage.removeItem(`pending_note_gen_${noteId}`);
+        localStorage.removeItem(`pending_note_gen_${noteId}`);
       }
     );
   };
@@ -127,11 +131,28 @@ export const NotePage: React.FC = () => {
         }
       }
 
-      // 2. Check if there's a pending stream generation for this note ID (session or local storage)
+      // 2. Check if this note is already saved in storage
+      const existingNote = await notesApi.fetchNoteById(id);
+      if (existingNote && existingNote.htmlContent) {
+        if (isMounted) {
+          setActiveDocument(existingNote);
+          setIsLoadingDoc(false);
+          sessionStorage.removeItem(`pending_note_gen_${id}`);
+          localStorage.removeItem(`pending_note_gen_${id}`);
+          if (searchParams.get('streaming')) {
+            navigate(`/notes/${id}`, { replace: true });
+          }
+          return;
+        }
+      }
+
+      // 3. If not already saved, check if there's a pending stream generation
       const pendingRaw = sessionStorage.getItem(`pending_note_gen_${id}`) || localStorage.getItem(`pending_note_gen_${id}`);
       if (pendingRaw) {
         try {
           const draftData = JSON.parse(pendingRaw);
+          sessionStorage.removeItem(`pending_note_gen_${id}`);
+          localStorage.removeItem(`pending_note_gen_${id}`);
           if (!streamStartedRef.current) {
             streamStartedRef.current = true;
             await startStreamingSynthesis(id, draftData);
@@ -147,11 +168,9 @@ export const NotePage: React.FC = () => {
         return;
       }
 
-      // 3. Otherwise load existing saved note from storage/backend
-      setIsLoadingDoc(true);
-      const found = await notesApi.fetchNoteById(id);
+      // 4. Fallback if note doesn't exist
       if (isMounted) {
-        setActiveDocument(found);
+        setActiveDocument(null);
         setIsLoadingDoc(false);
       }
     };
