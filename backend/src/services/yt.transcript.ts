@@ -97,19 +97,51 @@ export async function fetchOEmbedMetadata(
   return { title: "", author: "" };
 }
 
-export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
-  // Each call picks the next proxy in the pool (round-robin)
-  const api = buildApi();
-  let transcript: TranscriptEntry[] = [];
-
+async function fetchTranscriptWithFallbacks(videoId: string, api: YouTubeTranscriptApi): Promise<TranscriptEntry[]> {
   try {
-    transcript = toEntries(await api.fetch(videoId, { languages: ["en"] }));
-  } catch {
+    const list = await api.list(videoId);
+    // 1. Try finding manually created or generated transcripts for 'en'
     try {
-      transcript = toEntries(await api.fetch(videoId));
+      const enTranscript = list.findTranscript(["en", "en-US", "en-GB"]);
+      return toEntries(await enTranscript.fetch());
     } catch {
-      // No transcript available
+      // 2. Fall back to any available first transcript in the list
+      const iter = list[Symbol.iterator]();
+      const first = iter.next().value;
+      if (first) {
+        return toEntries(await first.fetch());
+      }
     }
+  } catch (err: any) {
+    // If list() fails or fetch() fails, try direct api.fetch
+    try {
+      return toEntries(await api.fetch(videoId, { languages: ["en"] }));
+    } catch {
+      return toEntries(await api.fetch(videoId));
+    }
+  }
+  return [];
+}
+
+export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
+  const pool = getProxies();
+  const maxAttempts = pool.length > 0 ? pool.length : 1;
+  let transcript: TranscriptEntry[] = [];
+  let lastError: any = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const api = buildApi();
+    try {
+      transcript = await fetchTranscriptWithFallbacks(videoId, api);
+      if (transcript.length > 0) break;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[yt.transcript] Attempt ${attempt + 1}/${maxAttempts} failed for video ${videoId}:`, err?.message || err);
+    }
+  }
+
+  if (transcript.length === 0 && lastError) {
+    console.error(`[yt.transcript] All proxy attempts failed for video ${videoId}. Last error:`, lastError?.message || lastError);
   }
 
   const { title, author } = await fetchOEmbedMetadata(videoId);
