@@ -12,6 +12,107 @@ export function extractYouTubeId(url: string): string | null {
   return null;
 }
 
+const decodeEntities = (text: string): string => {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
+};
+
+const parseTranscriptXml = (xml: string, lang = 'en') => {
+  try {
+    const results = [];
+    const pRegex = /<p\s+t="(\d+)"\s+d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g;
+    let match;
+    while ((match = pRegex.exec(xml)) !== null) {
+      const startMs = parseInt(match[1], 10);
+      const durMs = parseInt(match[2], 10);
+      const inner = match[3];
+      let text = '';
+      const sRegex = /<s[^>]*>([^<]*)<\/s>/g;
+      let sMatch;
+      while ((sMatch = sRegex.exec(inner)) !== null) {
+        text += sMatch[1];
+      }
+      if (!text) {
+        text = inner.replace(/<[^>]+>/g, '');
+      }
+      text = decodeEntities(text).trim();
+      if (text) {
+        results.push({
+          text,
+          duration: durMs,
+          offset: startMs,
+          lang,
+        });
+      }
+    }
+    if (results.length > 0) return results;
+
+    const RE_XML_TRANSCRIPT = /<text\s+start="([^"]*)"\s+dur="([^"]*)"[^>]*>([^<]*)<\/text>/g;
+    const classicResults = [...xml.matchAll(RE_XML_TRANSCRIPT)];
+    return classicResults
+      .map((res) => ({
+        text: decodeEntities(res[3]).trim(),
+        duration: Math.round(parseFloat(res[2]) * 1000),
+        offset: Math.round(parseFloat(res[1]) * 1000),
+        lang,
+      }))
+      .filter((e) => Boolean(e.text));
+  } catch (err) {
+    return [];
+  }
+};
+
+export const fetchBrowserTranscript = async (
+  videoId: string
+): Promise<Array<{ text: string; offset: number; duration: number; lang: string }> | undefined> => {
+  try {
+    const resp = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'com.google.android.youtube/20.10.38 (Linux; U; Android 14)',
+      },
+      body: JSON.stringify({
+        context: {
+          client: {
+            clientName: 'ANDROID',
+            clientVersion: '20.10.38',
+          },
+        },
+        videoId,
+      }),
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      const captionTracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (Array.isArray(captionTracks) && captionTracks.length > 0) {
+        const chosen =
+          captionTracks.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('en')) ||
+          captionTracks[0];
+        if (chosen && chosen.baseUrl) {
+          const xmlRes = await fetch(chosen.baseUrl);
+          const xml = await xmlRes.text();
+          const parsed = parseTranscriptXml(xml, chosen.languageCode || 'en');
+          if (parsed.length > 0) {
+            return parsed;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Browser transcript fetch attempt error:', err);
+  }
+  return undefined;
+};
+
 const getSavedLocalNotes = (): Note[] => {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -78,11 +179,16 @@ export const notesApi = {
       }
     }
 
+    const effectiveTranscript =
+      params.transcript && params.transcript.length > 0
+        ? params.transcript
+        : await fetchBrowserTranscript(videoId);
+
     const payload = {
       videoId,
       videoTitle: titleCandidate,
       customPrompt: params.customPrompt || undefined,
-      transcript: params.transcript && params.transcript.length > 0 ? params.transcript : undefined,
+      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
       detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
       diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
       examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
@@ -144,11 +250,16 @@ export const notesApi = {
       }
     }
 
+    const effectiveTranscript =
+      params.transcript && params.transcript.length > 0
+        ? params.transcript
+        : await fetchBrowserTranscript(videoId);
+
     const payload = {
       videoId,
       videoTitle: titleCandidate,
       customPrompt: params.customPrompt || undefined,
-      transcript: params.transcript && params.transcript.length > 0 ? params.transcript : undefined,
+      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
       detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
       diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
       examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
