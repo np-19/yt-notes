@@ -2,4 +2,8 @@ node_modules/
 dist/
 backend/.env
 frontend/.env
+backend/api/*.js
+backend/api/*.d.ts
+backend/api/*.map
 *.log
+
