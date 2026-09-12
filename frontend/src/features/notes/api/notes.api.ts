@@ -73,42 +73,20 @@ export const fetchBrowserTranscript = async (
   videoId: string
 ): Promise<Array<{ text: string; offset: number; duration: number; lang: string }> | undefined> => {
   try {
-    const resp = await fetch('https://www.youtube.com/youtubei/v1/player?prettyPrint=false', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'com.google.android.youtube/20.10.38 (Linux; U; Android 14)',
-      },
-      body: JSON.stringify({
-        context: {
-          client: {
-            clientName: 'ANDROID',
-            clientVersion: '20.10.38',
-          },
-        },
-        videoId,
-      }),
-    });
-
-    if (resp.ok) {
-      const data = await resp.json();
-      const captionTracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-      if (Array.isArray(captionTracks) && captionTracks.length > 0) {
-        const chosen =
-          captionTracks.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('en')) ||
-          captionTracks[0];
-        if (chosen && chosen.baseUrl) {
-          const xmlRes = await fetch(chosen.baseUrl);
-          const xml = await xmlRes.text();
-          const parsed = parseTranscriptXml(xml, chosen.languageCode || 'en');
-          if (parsed.length > 0) {
-            return parsed;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      return new Promise((resolve) => {
+        chrome.storage.local.get([`transcript_${videoId}`], (res) => {
+          const stored = res?.[`transcript_${videoId}`];
+          if (Array.isArray(stored) && stored.length > 0) {
+            resolve(stored);
+          } else {
+            resolve(undefined);
           }
-        }
-      }
+        });
+      });
     }
   } catch (err) {
-    console.warn('Browser transcript fetch attempt error:', err);
+    // ignore
   }
   return undefined;
 };
