@@ -129,7 +129,7 @@ export const NotePage: React.FC = () => {
 
       // 2. Check if there's a pending stream generation for this note ID
       const pendingRaw = sessionStorage.getItem(`pending_note_gen_${id}`);
-      if (pendingRaw && (isStreamingQuery || !streamStartedRef.current)) {
+      if (pendingRaw) {
         try {
           const draftData = JSON.parse(pendingRaw);
           if (!streamStartedRef.current) {
@@ -156,14 +156,14 @@ export const NotePage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [id, isStreamingQuery]);
+  }, [id]);
 
   if (isLoadingDoc) {
     return (
       <MainLayout>
         <div className="flex flex-col items-center justify-center py-20">
           <Spinner size="lg" />
-          <p className="mt-4 text-sm text-stone-500 font-mono">Loading requested document...</p>
+          <p className="mt-4 text-sm text-stone-500 font-mono">Synthesizing requested document...</p>
         </div>
       </MainLayout>
     );
@@ -173,12 +173,12 @@ export const NotePage: React.FC = () => {
     return (
       <MainLayout>
         <div className="max-w-md mx-auto my-20 p-8 bg-amber-50/70 border border-amber-200/80 rounded-2xl text-center shadow-sm">
-          <h2 className="font-serif font-bold text-xl text-stone-900 mb-2">Document Not Found</h2>
+          <h2 className="font-serif font-bold text-xl text-stone-900 mb-2">No Active Note</h2>
           <p className="text-sm text-stone-600 mb-6">
-            The note document you are trying to view does not exist or has been deleted.
+            Enter a YouTube link on the homepage to generate new structured academic notes.
           </p>
-          <Button variant="primary" onClick={() => navigate('/notes')}>
-            Return to Library
+          <Button variant="primary" onClick={() => navigate('/')}>
+            + Create New Note
           </Button>
         </div>
       </MainLayout>
