@@ -66,16 +66,20 @@ export const sampleKafkaHtml = `
     <li>Generate a formal tax invoice and update analytics dashboards</li>
   </ul>
 
-  <div class="flow-diagram">
-    <div class="flow-node highlight">User Places Order</div>
-    <div class="flow-arrow">→</div>
-    <div class="flow-node highlight">Order Service</div>
-    <div class="flow-arrow">→</div>
-    <div class="flow-node accent">Inventory Service</div>
-    <div class="flow-node accent">Email Service</div>
-    <div class="flow-node accent">SMS Service</div>
-    <div class="flow-arrow">→</div>
-    <div class="flow-node warm">Response sent to user (only after ALL finish)</div>
+  <div class="mermaid">
+    graph LR
+      classDef user fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a,rx:8px,ry:8px;
+      classDef service fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,rx:8px,ry:8px;
+      classDef downstream fill:#faf5ff,stroke:#a855f7,stroke-width:2px,color:#581c87,rx:8px,ry:8px;
+      classDef response fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b,rx:8px,ry:8px;
+
+      U["User Places Order"]:::user --> O["Order Service"]:::service
+      O --> I["Inventory Service"]:::downstream
+      O --> E["Email Service"]:::downstream
+      O --> S["SMS Service"]:::downstream
+      I --> R["Blocking Response (High Latency)"]:::response
+      E --> R
+      S --> R
   </div>
 
   <h3>1.2 The Naive (Synchronous) Approach and Its Problems</h3>
@@ -317,14 +321,16 @@ int targetPartition = Math.abs(key.hashCode()) % totalPartitions;
   <h2>6. Offsets, Crash Recovery & Delivery Guarantees</h2>
   <p>An <strong>offset</strong> is a sequential integer bookmark assigned to each record in a partition. It uniquely tracks progress.</p>
 
-  <div class="flow-diagram">
-    <div class="flow-node">Consumer polls offset 20-30</div>
-    <div class="flow-arrow">→</div>
-    <div class="flow-node warm">Service Crashes mid-batch</div>
-    <div class="flow-arrow">→</div>
-    <div class="flow-node">Offset in Kafka stays at 20</div>
-    <div class="flow-arrow">→</div>
-    <div class="flow-node accent">Consumer restarts & safely re-processes 20-30</div>
+  <div class="mermaid">
+    graph LR
+      classDef step fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#14532d,rx:8px,ry:8px;
+      classDef crash fill:#fef2f2,stroke:#ef4444,stroke-width:2px,color:#991b1b,rx:8px,ry:8px;
+      classDef broker fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,rx:8px,ry:8px;
+      classDef recover fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a,rx:8px,ry:8px;
+
+      A["Consumer Polls Offsets 20-30"]:::step --> B["Service Crashes Mid-Batch"]:::crash
+      B --> C["Offset In Kafka Remains 20"]:::broker
+      C --> D["Consumer Restarts & Replays 20-30"]:::recover
   </div>
 
   <h3>Delivery Guarantees Compared</h3>

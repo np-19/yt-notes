@@ -1,4 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap');
+@import "tailwindcss";
+
+
 
 /* ==========================================================================
    Original Minimalist Theme & Reset
@@ -715,7 +718,7 @@ button:disabled {
   color: #ffffff !important;
   border: 0 !important;
   border-radius: 6px !important;
-  padding: 10px 16px !important;
+  padding: 10px 20px !important;
   font-size: 16px !important;
   font-weight: 700 !important;
   line-height: 1.35 !important;
@@ -723,6 +726,7 @@ button:disabled {
   margin-bottom: 18px !important;
   break-after: avoid;
   page-break-after: avoid;
+  box-sizing: border-box;
 }
 
 /* Subheadings (h3) - Themed with 1px border underline */
@@ -1003,8 +1007,8 @@ footer {
 }
 
 @media print {
-  html, body {
-    width: 210mm !important;
+  html, body, main {
+    width: 100% !important;
     background: #ffffff !important;
     color: #1e293b !important;
     margin: 0 !important;
@@ -1012,10 +1016,10 @@ footer {
     font-size: 11pt !important;
     line-height: 1.55 !important;
   }
-  .app {
-    background: #ffffff !important;
-    min-height: auto !important;
-  }
+  .no-print,
+  header,
+  aside,
+  nav,
   .topbar,
   .reader-toolbar,
   .reader-layout nav,
@@ -1026,7 +1030,7 @@ footer {
   .workspace {
     display: none !important;
   }
-  .shell {
+  .shell, main {
     max-width: 100% !important;
     width: 100% !important;
     margin: 0 !important;
@@ -1050,7 +1054,7 @@ footer {
     border-radius: 0 !important;
     box-shadow: none !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     width: 100% !important;
     max-width: 100% !important;
     color: #23272f !important;
@@ -1067,6 +1071,8 @@ footer {
     text-align: center !important;
     padding-top: 40mm !important;
     padding-bottom: 20mm !important;
+    padding-left: 10mm !important;
+    padding-right: 10mm !important;
     page-break-after: always !important;
     break-after: page !important;
     border: none !important;
@@ -1076,8 +1082,8 @@ footer {
     display: none !important;
   }
   .note-content > :not(.note-cover) {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    padding-left: 10mm !important;
+    padding-right: 10mm !important;
   }
   .note-content .note-cover h1 {
     font-size: 30pt !important;
@@ -1115,26 +1121,33 @@ footer {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  .note-content h2,
   h2 {
     break-after: avoid !important;
     page-break-after: avoid !important;
-    margin-top: 20pt !important;
-    margin-bottom: 10pt !important;
-    font-size: 13pt !important;
+    margin-top: 22pt !important;
+    margin-bottom: 11pt !important;
+    font-size: 13.5pt !important;
+    font-weight: 700 !important;
     background: var(--note-banner-bg, #6a1b9a) !important;
     color: #ffffff !important;
-    padding: 7pt 12pt !important;
-    border-radius: 4pt !important;
+    padding: 9pt 20pt !important;
+    border-radius: 5pt !important;
+    box-sizing: border-box !important;
+    display: block !important;
+    width: 100% !important;
   }
+  .note-content h3,
   h3 {
     break-after: avoid !important;
     page-break-after: avoid !important;
-    margin-top: 14pt !important;
-    margin-bottom: 6pt !important;
+    margin-top: 15pt !important;
+    margin-bottom: 7pt !important;
     font-size: 11pt !important;
     color: var(--note-primary, #6a1b9a) !important;
     border-bottom: 1px solid var(--note-underline, #d1a3e0) !important;
-    padding-bottom: 3pt !important;
+    padding-bottom: 4pt !important;
+    padding-left: 2pt !important;
   }
   .callout, table, pre, .flow-diagram, .mermaid, .grid-2 {
     break-inside: avoid !important;

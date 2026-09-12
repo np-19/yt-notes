@@ -1,1 +1,44 @@
-{"manifest_version":3,"name":"LectureNotes AI","version":"1.0.0","description":"Turn technical YouTube lectures into structured notes.","action":{"default_popup":"index.html","default_title":"LectureNotes AI"},"permissions":["storage","tabs"],"host_permissions":["https://www.youtube.com/*","http://localhost:5000/*"],"content_scripts":[{"matches":["https://www.youtube.com/watch*"],"js":["content.js"],"run_at":"document_idle"}],"background":{"service_worker":"background.js"}}
+{
+  "manifest_version": 3,
+  "name": "LectureNotes AI",
+  "version": "1.0.0",
+  "description": "Turn technical YouTube lectures into structured notes.",
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "LectureNotes AI"
+  },
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/watch*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "index.html",
+        "assets/*"
+      ],
+      "matches": [
+        "https://www.youtube.com/*"
+      ]
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

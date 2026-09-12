@@ -20,7 +20,10 @@ app.use("/api/notes", notesRouter);
 
 const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   if (error instanceof ExpressError) return res.status(error.status).json({ success: false, error: error.message });
-  if (error?.name === "ZodError") return res.status(400).json({ success: false, error: "Invalid request" });
+  if (error?.name === "ZodError" || error?.issues) {
+    const details = error.issues?.map((i: any) => `${i.path.join('.') || 'body'}: ${i.message}`).join('; ') || "Invalid request payload";
+    return res.status(400).json({ success: false, error: details });
+  }
   console.error(error);
   return res.status(500).json({ success: false, error: "Something went wrong on the server." });
 };
