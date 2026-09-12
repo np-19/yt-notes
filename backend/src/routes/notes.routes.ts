@@ -116,6 +116,7 @@ router.post("/stream", async (req, res) => {
     res.write(`data: ${JSON.stringify({ type: "done", markdown: fullMarkdown, title: finalTitle })}\n\n`);
     res.end();
   } catch (error: any) {
+    console.error(`[notes.routes/stream] Stream error:`, error?.message || error);
     res.write(`data: ${JSON.stringify({ type: "error", message: error?.message || "Failed to generate stream." })}\n\n`);
     res.end();
   }

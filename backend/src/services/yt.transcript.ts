@@ -98,18 +98,33 @@ export async function fetchOEmbedMetadata(
 }
 
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
-  // Each call picks the next proxy in the pool (round-robin)
-  const api = buildApi();
+  const pool = getProxies();
+  const maxAttempts = pool.length > 0 ? Math.min(pool.length, 5) : 1;
   let transcript: TranscriptEntry[] = [];
+  let lastError: any = null;
 
-  try {
-    transcript = toEntries(await api.fetch(videoId, { languages: ["en"] }));
-  } catch {
+  console.log(`[yt.transcript] Fetching transcript for video ${videoId} (available proxies: ${pool.length})`);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const api = buildApi();
     try {
-      transcript = toEntries(await api.fetch(videoId));
-    } catch {
-      // No transcript available
+      try {
+        transcript = toEntries(await api.fetch(videoId, { languages: ["en"] }));
+      } catch {
+        transcript = toEntries(await api.fetch(videoId));
+      }
+      if (transcript.length > 0) {
+        console.log(`[yt.transcript] Successfully fetched ${transcript.length} transcript lines on attempt ${attempt + 1}`);
+        break;
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[yt.transcript] Attempt ${attempt + 1}/${maxAttempts} failed for video ${videoId}:`, err?.message || err);
     }
+  }
+
+  if (transcript.length === 0 && lastError) {
+    console.error(`[yt.transcript] All ${maxAttempts} proxy attempts failed for video ${videoId}:`, lastError?.message || lastError);
   }
 
   const { title, author } = await fetchOEmbedMetadata(videoId);
