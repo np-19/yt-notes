@@ -230,24 +230,40 @@ export async function generateNotesStream(
 export async function editNotes(markdown: string, instruction: string, selection?: string): Promise<string> {
   let prompt = "";
   if (selection && selection.trim().length > 0) {
-    prompt = `You are an expert technical document editor.
-Selected Markdown snippet to rewrite:
+    prompt = `You are an expert academic technical editor.
+Modify the following lecture-notes Markdown document according to the user's instruction, focusing specifically on refining the targeted section.
+
+Targeted Selection to modify:
 """
 ${selection.trim()}
 """
 
 User Instruction: "${instruction}"
 
-Document Context (for terminology & consistency):
+Full Existing Markdown Document:
 """
-${markdown.slice(0, 2500)}
+${markdown}
 """
 
-Task: Return ONLY the revised Markdown replacement for the selected snippet adhering to the user instruction.
-Preserve LaTeX formulas and code formatting unless instructed to change them.
-CRITICAL: Do NOT include intro/outro text, and do NOT wrap the entire response in markdown code fences. Return ONLY the revised text.`;
+Task:
+1. Locate the targeted section within the document.
+2. Apply the user's instruction specifically to refine, rewrite, expand, or simplify that section.
+3. Keep the rest of the document, headings, LaTeX formulas, tables, and Mermaid flowcharts intact.
+4. Output the COMPLETE updated Markdown document.
+
+CRITICAL: Return ONLY raw Markdown text. Do NOT wrap the entire output in markdown code fences.`;
   } else {
-    prompt = `Modify this existing lecture-notes Markdown according to the instruction. Preserve unrelated content, structure, LaTeX formulas, diagrams, tables and formatting. Return only updated Markdown without code fences wrapping the entire document. Instruction: ${instruction}. Existing Markdown:\n${markdown}`;
+    prompt = `You are an expert academic technical editor.
+Modify this existing lecture-notes Markdown according to the user's instruction: "${instruction}".
+Preserve unrelated content, structure, LaTeX formulas, diagrams, tables and formatting.
+
+Full Existing Markdown Document:
+"""
+${markdown}
+"""
+
+Task: Return the COMPLETE revised Markdown document adhering to the instruction.
+CRITICAL: Return ONLY raw Markdown text. Do NOT wrap the entire output in markdown code fences.`;
   }
 
   return executeWithModelFallback("editNotes", async (model) => {
@@ -258,6 +274,6 @@ CRITICAL: Do NOT include intro/outro text, and do NOT wrap the entire response i
     } else if (text.startsWith("```")) {
       text = text.replace(/^```\w*\s*/i, "").replace(/```$/i, "").trim();
     }
-    return text;
+    return text && text.length > 50 ? text : markdown;
   });
 }

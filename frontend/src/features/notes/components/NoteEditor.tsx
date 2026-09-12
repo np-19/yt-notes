@@ -471,13 +471,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     setIsAiRefining(true);
     try {
       const response = await notesApi.refineNotes(editableHtml, instruction, targetSelection);
-      if (response && response.html) {
-        let newMarkdown = editableHtml;
-        if (targetSelection && newMarkdown.includes(targetSelection)) {
-          newMarkdown = newMarkdown.replace(targetSelection, response.html);
-        } else if (response.html !== editableHtml) {
-          newMarkdown = response.html;
-        }
+      if (response && response.html && response.html.trim().length > 0) {
+        const newMarkdown = response.html.trim();
         onUpdateContent(newMarkdown, `AI Edit: ${instruction.slice(0, 24)}...`);
         setEditableHtml(newMarkdown);
       }
