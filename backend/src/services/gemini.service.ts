@@ -4,7 +4,20 @@ import { ExpressError } from "../utils/expressError.js";
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "./yt.transcript.js";
 
-const DEFAULT_MODEL = GeminiModel || "gemini-2.0-flash";
+const FAST_LOW_COST_MODELS = [
+  "gemini-2.0-flash-lite-preview-02-05",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash",
+];
+
+const SYNTHESIS_MODELS = [
+  GeminiModel || "gemini-2.0-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
+].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
 function getGenAI() {
   if (!GeminiApiKey) throw new ExpressError("Gemini is not configured. Add GEMINI_API_KEY to backend/.env.", 503);
@@ -14,19 +27,26 @@ function getGenAI() {
 export async function executeWithModelFallback<T>(
   actionName: string,
   fn: (model: any) => Promise<T | null | undefined>,
-  modelName: string = DEFAULT_MODEL
+  candidates: string[] = SYNTHESIS_MODELS
 ): Promise<T> {
   const ai = getGenAI();
-  try {
-    const model = ai.getGenerativeModel({ model: modelName });
-    const result = await fn(model);
-    if (result !== undefined && result !== null) return result;
-    throw new Error("Model returned empty output.");
-  } catch (error: any) {
-    console.error(`[${actionName}] Model ${modelName} error:`, error?.message || error);
-    throw new ExpressError(`AI service error (${actionName}): ${error?.message || "Generation failed."}`, 502, error);
+  let lastError: any = null;
+
+  for (const modelName of candidates) {
+    try {
+      const model = ai.getGenerativeModel({ model: modelName });
+      const result = await fn(model);
+      if (result !== undefined && result !== null) return result;
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`[${actionName}] Model ${modelName} failed, trying fallback:`, error?.message || error);
+    }
   }
+
+  throw new ExpressError(`The AI service encountered an error (${actionName}): ${lastError?.message || "All models failed."}`, 502, lastError);
 }
+
+export { FAST_LOW_COST_MODELS };
 
 function buildNotesPrompt(
   videoId: string,
