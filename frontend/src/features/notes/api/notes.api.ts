@@ -12,63 +12,6 @@ export function extractYouTubeId(url: string): string | null {
   return null;
 }
 
-const decodeEntities = (text: string): string => {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
-};
-
-const parseTranscriptXml = (xml: string, lang = 'en') => {
-  try {
-    const results = [];
-    const pRegex = /<p\s+t="(\d+)"\s+d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g;
-    let match;
-    while ((match = pRegex.exec(xml)) !== null) {
-      const startMs = parseInt(match[1], 10);
-      const durMs = parseInt(match[2], 10);
-      const inner = match[3];
-      let text = '';
-      const sRegex = /<s[^>]*>([^<]*)<\/s>/g;
-      let sMatch;
-      while ((sMatch = sRegex.exec(inner)) !== null) {
-        text += sMatch[1];
-      }
-      if (!text) {
-        text = inner.replace(/<[^>]+>/g, '');
-      }
-      text = decodeEntities(text).trim();
-      if (text) {
-        results.push({
-          text,
-          duration: durMs,
-          offset: startMs,
-          lang,
-        });
-      }
-    }
-    if (results.length > 0) return results;
-
-    const RE_XML_TRANSCRIPT = /<text\s+start="([^"]*)"\s+dur="([^"]*)"[^>]*>([^<]*)<\/text>/g;
-    const classicResults = [...xml.matchAll(RE_XML_TRANSCRIPT)];
-    return classicResults
-      .map((res) => ({
-        text: decodeEntities(res[3]).trim(),
-        duration: Math.round(parseFloat(res[2]) * 1000),
-        offset: Math.round(parseFloat(res[1]) * 1000),
-        lang,
-      }))
-      .filter((e) => Boolean(e.text));
-  } catch (err) {
-    return [];
-  }
-};
-
 export const fetchBrowserTranscript = async (
   videoId: string
 ): Promise<Array<{ text: string; offset: number; duration: number; lang: string }> | undefined> => {
@@ -77,11 +20,7 @@ export const fetchBrowserTranscript = async (
       return new Promise((resolve) => {
         chrome.storage.local.get([`transcript_${videoId}`], (res) => {
           const stored = res?.[`transcript_${videoId}`];
-          if (Array.isArray(stored) && stored.length > 0) {
-            resolve(stored);
-          } else {
-            resolve(undefined);
-          }
+          resolve(Array.isArray(stored) && stored.length > 0 ? stored : undefined);
         });
       });
     }
@@ -114,6 +53,53 @@ const saveLocalNotes = (notes: Note[]) => {
   }
 };
 
+const detailLevelMap: Record<string, 'quick' | 'short' | 'standard' | 'detailed' | 'deep_dive'> = {
+  summary: 'short',
+  detailed: 'standard',
+  comprehensive: 'deep_dive',
+};
+
+const diagramDensityMap: Record<string, 'minimal' | 'balanced' | 'aggressive'> = {
+  none: 'minimal',
+  balanced: 'balanced',
+  heavy: 'aggressive',
+};
+
+const examplesMap: Record<string, 'minimal' | 'normal' | 'many'> = {
+  concise: 'minimal',
+  many: 'many',
+};
+
+async function buildNotePayload(params: GenerateNotesParams) {
+  const videoId = extractYouTubeId(params.youtubeUrl);
+  if (!videoId) {
+    throw new Error('Please enter a valid YouTube video URL or 11-character video ID.');
+  }
+
+  let titleCandidate = params.customTopic?.trim() || `Lecture Notes — ${videoId}`;
+
+  const effectiveTranscript =
+    params.transcript && params.transcript.length > 0
+      ? params.transcript
+      : await fetchBrowserTranscript(videoId);
+
+  return {
+    videoId,
+    titleCandidate,
+    payload: {
+      videoId,
+      videoTitle: titleCandidate,
+      customPrompt: params.customPrompt || undefined,
+      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
+      detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
+      diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
+      examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
+      includeCode: params.settings?.includeCode !== false,
+      detailedMath: params.settings?.detailedMath !== false,
+    },
+  };
+}
+
 export const notesApi = {
   fetchNotes: async (): Promise<Note[]> => {
     return getSavedLocalNotes();
@@ -125,54 +111,7 @@ export const notesApi = {
   },
 
   generateNotes: async (params: GenerateNotesParams): Promise<{ html: string; title: string }> => {
-    const extractedId = extractYouTubeId(params.youtubeUrl);
-    if (!extractedId) {
-      throw new Error('Please enter a valid YouTube video URL or 11-character video ID.');
-    }
-    const videoId = extractedId;
-
-    const detailLevelMap: Record<string, 'quick' | 'short' | 'standard' | 'detailed' | 'deep_dive'> = {
-      summary: 'short',
-      detailed: 'standard',
-      comprehensive: 'deep_dive',
-    };
-
-    const diagramDensityMap: Record<string, 'minimal' | 'balanced' | 'aggressive'> = {
-      none: 'minimal',
-      balanced: 'balanced',
-      heavy: 'aggressive',
-    };
-
-    const examplesMap: Record<string, 'minimal' | 'normal' | 'many'> = {
-      concise: 'minimal',
-      many: 'many',
-    };
-
-    let titleCandidate = params.customTopic?.trim();
-    if (!titleCandidate) {
-      if (params.youtubeUrl.includes('pWO3HyVG-xg') || params.youtubeUrl.toLowerCase().includes('electricity')) {
-        titleCandidate = 'Current Electricity & Circuit Laws Masterclass';
-      } else {
-        titleCandidate = `Lecture Notes — ${videoId}`;
-      }
-    }
-
-    const effectiveTranscript =
-      params.transcript && params.transcript.length > 0
-        ? params.transcript
-        : await fetchBrowserTranscript(videoId);
-
-    const payload = {
-      videoId,
-      videoTitle: titleCandidate,
-      customPrompt: params.customPrompt || undefined,
-      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
-      detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
-      diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
-      examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
-      includeCode: params.settings?.includeCode !== false,
-      detailedMath: params.settings?.detailedMath !== false,
-    };
+    const { titleCandidate, payload } = await buildNotePayload(params);
 
     const response = await apiClient.post<{
       success: boolean;
@@ -195,62 +134,22 @@ export const notesApi = {
     onDone: (finalMarkdown: string, title: string) => void,
     onError: (error: string) => void
   ): Promise<void> => {
-    const extractedId = extractYouTubeId(params.youtubeUrl);
-    if (!extractedId) {
-      onError('Please enter a valid YouTube video URL or 11-character video ID.');
+    let titleCandidate = '';
+    let payload: any = null;
+
+    try {
+      const prepared = await buildNotePayload(params);
+      titleCandidate = prepared.titleCandidate;
+      payload = prepared.payload;
+    } catch (err: any) {
+      onError(err?.message || 'Invalid video parameter.');
       return;
     }
-    const videoId = extractedId;
-
-    const detailLevelMap: Record<string, 'quick' | 'short' | 'standard' | 'detailed' | 'deep_dive'> = {
-      summary: 'short',
-      detailed: 'standard',
-      comprehensive: 'deep_dive',
-    };
-
-    const diagramDensityMap: Record<string, 'minimal' | 'balanced' | 'aggressive'> = {
-      none: 'minimal',
-      balanced: 'balanced',
-      heavy: 'aggressive',
-    };
-
-    const examplesMap: Record<string, 'minimal' | 'normal' | 'many'> = {
-      concise: 'minimal',
-      many: 'many',
-    };
-
-    let titleCandidate = params.customTopic?.trim();
-    if (!titleCandidate) {
-      if (params.youtubeUrl.includes('pWO3HyVG-xg') || params.youtubeUrl.toLowerCase().includes('electricity')) {
-        titleCandidate = 'Current Electricity & Circuit Laws Masterclass';
-      } else {
-        titleCandidate = `Lecture Notes — ${videoId}`;
-      }
-    }
-
-    const effectiveTranscript =
-      params.transcript && params.transcript.length > 0
-        ? params.transcript
-        : await fetchBrowserTranscript(videoId);
-
-    const payload = {
-      videoId,
-      videoTitle: titleCandidate,
-      customPrompt: params.customPrompt || undefined,
-      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
-      detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
-      diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
-      examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
-      includeCode: params.settings?.includeCode !== false,
-      detailedMath: params.settings?.detailedMath !== false,
-    };
 
     try {
       const response = await fetch(`${env.backendUrl}/api/notes/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -311,10 +210,7 @@ export const notesApi = {
         instruction,
         selection: selection || undefined,
       });
-      if (response.data?.data?.html) {
-        return { html: response.data.data.html };
-      }
-      return { html: htmlContent };
+      return { html: response.data?.data?.html || htmlContent };
     } catch (err: any) {
       console.warn('Refinement API error:', err);
       return { html: htmlContent };

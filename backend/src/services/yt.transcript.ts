@@ -1,5 +1,6 @@
 import { fetchTranscript } from "youtube-transcript";
 import type { TranscriptResponse } from "youtube-transcript";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 
 export type TranscriptEntry = {
   text: string;
@@ -15,6 +16,79 @@ export type VideoInfo = {
   transcript: TranscriptEntry[];
   hasSubtitles: boolean;
 };
+
+const normalizeProxyUrl = (entry: string): string | null => {
+  const trimmed = entry.trim();
+  if (!trimmed) return null;
+  // Format: ip:port:username:password
+  const colonParts = trimmed.split(":");
+  if (colonParts.length === 4) {
+    const [ip, port, user, pass] = colonParts;
+    return `http://${user}:${pass}@${ip}:${port}`;
+  }
+  // Format: http:// or https:// or socks5://
+  if (/^https?:\/\//i.test(trimmed) || /^socks5:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return `http://${trimmed}`;
+};
+
+const getProxyDispatchers = (): ProxyAgent[] => {
+  const raw = process.env.YOUTUBE_PROXY_URL || process.env.YOUTUBE_PROXIES || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || "";
+  if (!raw.trim()) return [];
+
+  const rawEntries = raw
+    .split(/[\r\n,]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const agents: ProxyAgent[] = [];
+  for (const entry of rawEntries) {
+    const normalized = normalizeProxyUrl(entry);
+    if (!normalized) continue;
+    try {
+      agents.push(new ProxyAgent(normalized));
+    } catch (e) {
+      console.warn("[yt.transcript] Invalid proxy URL skipped:", entry, e);
+    }
+  }
+  return agents;
+};
+
+const proxyAgents = getProxyDispatchers();
+let currentProxyIndex = 0;
+
+function getNextProxyAgent(): ProxyAgent | undefined {
+  if (proxyAgents.length === 0) return undefined;
+  const agent = proxyAgents[currentProxyIndex % proxyAgents.length];
+  currentProxyIndex = (currentProxyIndex + 1) % proxyAgents.length;
+  return agent;
+}
+
+async function proxyFetch(url: string, init: any = {}): Promise<Response> {
+  const agent = getNextProxyAgent();
+  if (agent) {
+    try {
+      return (await undiciFetch(url, {
+        ...init,
+        dispatcher: agent,
+      })) as unknown as Response;
+    } catch (err) {
+      console.warn("[yt.transcript] Proxy request failed, falling back to direct/next proxy:", err);
+      // Try next proxy or direct fetch
+      const backupAgent = getNextProxyAgent();
+      if (backupAgent && backupAgent !== agent) {
+        try {
+          return (await undiciFetch(url, {
+            ...init,
+            dispatcher: backupAgent,
+          })) as unknown as Response;
+        } catch (e) {}
+      }
+    }
+  }
+  return fetch(url, init);
+}
 
 const decodeEntities = (text: string): string => {
   return text
@@ -81,7 +155,7 @@ export const parseTranscriptXml = (xml: string, lang = "en"): TranscriptEntry[] 
 
 export async function fetchOEmbedMetadata(videoId: string): Promise<{ title: string; author: string }> {
   try {
-    const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+    const res = await proxyFetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
     if (res.ok) {
       const data = (await res.json()) as { title?: string; author_name?: string };
       return {
@@ -100,7 +174,7 @@ async function fetchInnerTube(
   clientConfig: { clientName: string; clientVersion: string; userAgent: string }
 ): Promise<{ transcript: TranscriptEntry[]; title: string; author: string } | null> {
   try {
-    const res = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+    const res = await proxyFetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -130,7 +204,7 @@ async function fetchInnerTube(
           tracks.find((t: any) => t.languageCode === "en" || t.vssId?.includes("en")) ||
           tracks[0];
         if (chosen && chosen.baseUrl) {
-          const trackRes = await fetch(chosen.baseUrl);
+          const trackRes = await proxyFetch(chosen.baseUrl);
           const xml = await trackRes.text();
           const parsed = parseTranscriptXml(xml, chosen.languageCode || "en");
           if (parsed.length > 0) {
@@ -233,9 +307,4 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
     transcript,
     hasSubtitles: transcript.length > 0,
   };
-}
-
-export async function getTranscript(videoId: string): Promise<TranscriptEntry[]> {
-  const result = await getVideoDetailsAndTranscript(videoId);
-  return result.transcript;
 }

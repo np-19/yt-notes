@@ -17,6 +17,27 @@ function getGenAI() {
   return new GoogleGenerativeAI(GeminiApiKey);
 }
 
+async function executeWithModelFallback<T>(
+  actionName: string,
+  fn: (model: any) => Promise<T | null | undefined>
+): Promise<T> {
+  const ai = getGenAI();
+  let lastError: any = null;
+
+  for (const modelName of MODEL_CANDIDATES) {
+    try {
+      const model = ai.getGenerativeModel({ model: modelName });
+      const result = await fn(model);
+      if (result !== undefined && result !== null) return result;
+    } catch (error: any) {
+      lastError = error;
+      console.warn(`[${actionName}] Model ${modelName} failed, trying fallback:`, error?.message || error);
+    }
+  }
+
+  throw new ExpressError(`The AI service encountered an error (${actionName}): ${lastError?.message || "All models failed."}`, 502, lastError);
+}
+
 function buildNotesPrompt(
   videoId: string,
   transcript: TranscriptEntry[],
@@ -169,24 +190,11 @@ export async function generateNotes(
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
 ): Promise<string> {
   const prompt = buildNotesPrompt(videoId, transcript, settings);
-  const ai = getGenAI();
-
-  let lastError: any = null;
-  for (const modelName of MODEL_CANDIDATES) {
-    try {
-      const model = ai.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      if (text && text.trim().length > 0) {
-        return text;
-      }
-    } catch (error: any) {
-      lastError = error;
-      console.warn(`[generateNotes] Model ${modelName} failed, trying next fallback:`, error?.message || error);
-    }
-  }
-
-  throw new ExpressError("The AI service could not generate notes right now: " + (lastError?.message || "All models failed."), 502, lastError);
+  return executeWithModelFallback("generateNotes", async (model) => {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return text && text.trim().length > 0 ? text : null;
+  });
 }
 
 export async function generateNotesStream(
@@ -196,29 +204,16 @@ export async function generateNotesStream(
   onChunk: (chunkText: string) => void
 ): Promise<string> {
   const prompt = buildNotesPrompt(videoId, transcript, settings);
-  const ai = getGenAI();
-
-  let lastError: any = null;
-  for (const modelName of MODEL_CANDIDATES) {
-    try {
-      const model = ai.getGenerativeModel({ model: modelName });
-      const streamingResult = await model.generateContentStream(prompt);
-      let fullText = "";
-      for await (const chunk of streamingResult.stream) {
-        const text = chunk.text();
-        fullText += text;
-        onChunk(text);
-      }
-      if (fullText.trim().length > 0) {
-        return fullText;
-      }
-    } catch (error: any) {
-      lastError = error;
-      console.warn(`[generateNotesStream] Model ${modelName} stream failed, trying next fallback:`, error?.message || error);
+  return executeWithModelFallback("generateNotesStream", async (model) => {
+    const streamingResult = await model.generateContentStream(prompt);
+    let fullText = "";
+    for await (const chunk of streamingResult.stream) {
+      const text = chunk.text();
+      fullText += text;
+      onChunk(text);
     }
-  }
-
-  throw new ExpressError("The AI streaming service encountered an error: " + (lastError?.message || "All models failed."), 502, lastError);
+    return fullText.trim().length > 0 ? fullText : null;
+  });
 }
 
 export async function editNotes(markdown: string, instruction: string, selection?: string): Promise<string> {
@@ -244,24 +239,14 @@ CRITICAL: Do NOT include intro/outro text, and do NOT wrap the entire response i
     prompt = `Modify this existing lecture-notes Markdown according to the instruction. Preserve unrelated content, structure, LaTeX formulas, diagrams, tables and formatting. Return only updated Markdown without code fences wrapping the entire document. Instruction: ${instruction}. Existing Markdown:\n${markdown}`;
   }
 
-  const ai = getGenAI();
-  let lastError: any = null;
-  for (const modelName of MODEL_CANDIDATES) {
-    try {
-      const model = ai.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      let text = result.response.text().trim();
-      if (text.startsWith("```markdown")) {
-        text = text.replace(/^```markdown\s*/i, "").replace(/```$/i, "").trim();
-      } else if (text.startsWith("```")) {
-        text = text.replace(/^```\w*\s*/i, "").replace(/```$/i, "").trim();
-      }
-      return text;
-    } catch (error: any) {
-      lastError = error;
-      console.warn(`[editNotes] Model ${modelName} failed, trying next fallback:`, error?.message || error);
+  return executeWithModelFallback("editNotes", async (model) => {
+    const result = await model.generateContent(prompt);
+    let text = result.response.text().trim();
+    if (text.startsWith("```markdown")) {
+      text = text.replace(/^```markdown\s*/i, "").replace(/```$/i, "").trim();
+    } else if (text.startsWith("```")) {
+      text = text.replace(/^```\w*\s*/i, "").replace(/```$/i, "").trim();
     }
-  }
-
-  throw new ExpressError("The AI service could not edit these notes right now: " + (lastError?.message || "All models failed."), 502, lastError);
+    return text;
+  });
 }

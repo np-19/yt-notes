@@ -7,6 +7,7 @@ import { ExpressError } from "../utils/expressError.js";
 
 const router = Router();
 const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Invalid YouTube video ID");
+
 const settings = z.object({
   detailLevel: z.enum(detailLevels).default("standard"),
   diagramDensity: z.enum(diagramDensities).default("balanced"),
@@ -29,29 +30,46 @@ const notePayloadSchema = settings.extend({
   transcript: z.array(transcriptEntrySchema).optional(),
 });
 
+type NotePayload = z.infer<typeof notePayloadSchema>;
+
+async function prepareSynthesisContext(body: NotePayload) {
+  let transcript = body.transcript || [];
+  let resolvedTitle = body.videoTitle;
+
+  if (transcript.length === 0 || !resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+    const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
+    if (transcript.length === 0 && videoInfo.transcript.length > 0) {
+      transcript = videoInfo.transcript;
+    }
+    if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+      resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
+    }
+  }
+
+  if (!transcript || transcript.length === 0) {
+    throw new ExpressError(
+      "A transcript is not available for this video. Please ensure the video has closed captions (CC) or subtitles enabled on YouTube.",
+      422
+    );
+  }
+
+  return {
+    transcript,
+    resolvedTitle: resolvedTitle || `Lecture Notes — ${body.videoId}`,
+  };
+}
+
+function resolveDocumentTitle(markdown: string, fallbackTitle: string): string {
+  const match =
+    markdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i) ||
+    markdown.match(/^#\s+([^\n]+)/m);
+  return fallbackTitle || match?.[1]?.trim() || "Lecture Notes";
+}
+
 router.post("/", async (req, res, next) => {
   try {
     const body = notePayloadSchema.parse(req.body);
-    let transcript = body.transcript || [];
-    let resolvedTitle = body.videoTitle;
-
-    if (transcript.length === 0 || !resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-      const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
-      if (transcript.length === 0 && videoInfo.transcript.length > 0) {
-        transcript = videoInfo.transcript;
-      }
-      if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-        resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
-      }
-    }
-
-    // Strictly require video transcript to synthesize notes
-    if (!transcript || transcript.length === 0) {
-      throw new ExpressError(
-        "A transcript is not available for this video. Please ensure the video has closed captions (CC) or subtitles enabled on YouTube.",
-        422
-      );
-    }
+    const { transcript, resolvedTitle } = await prepareSynthesisContext(body);
 
     const markdown = await generateNotes(body.videoId, transcript, {
       ...body,
@@ -59,11 +77,7 @@ router.post("/", async (req, res, next) => {
     });
 
     const { videoId: _videoId, videoTitle: _vt, transcript: _t, ...noteSettings } = body;
-
-    const extractedTitleMatch =
-      markdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i) ||
-      markdown.match(/^#\s+([^\n]+)/m);
-    const finalTitle = resolvedTitle || extractedTitleMatch?.[1]?.trim() || `Lecture Notes — ${body.videoId}`;
+    const finalTitle = resolveDocumentTitle(markdown, resolvedTitle);
 
     res.json({
       success: true,
@@ -82,36 +96,12 @@ router.post("/", async (req, res, next) => {
 router.post("/stream", async (req, res) => {
   try {
     const body = notePayloadSchema.parse(req.body);
-    let transcript = body.transcript || [];
-    let resolvedTitle = body.videoTitle;
-
-    if (transcript.length === 0 || !resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-      const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
-      if (transcript.length === 0 && videoInfo.transcript.length > 0) {
-        transcript = videoInfo.transcript;
-      }
-      if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-        resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
-      }
-    }
+    const { transcript, resolvedTitle } = await prepareSynthesisContext(body);
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
-
-    // Strictly require video transcript to synthesize notes
-    if (!transcript || transcript.length === 0) {
-      res.write(
-        `data: ${JSON.stringify({
-          type: "error",
-          message:
-            "A transcript is not available for this video. Please ensure the video has closed captions (CC) or subtitles enabled on YouTube.",
-        })}\n\n`
-      );
-      res.end();
-      return;
-    }
 
     const fullMarkdown = await generateNotesStream(
       body.videoId,
@@ -122,11 +112,7 @@ router.post("/stream", async (req, res) => {
       }
     );
 
-    const extractedTitleMatch =
-      fullMarkdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i) ||
-      fullMarkdown.match(/^#\s+([^\n]+)/m);
-    const finalTitle = resolvedTitle || extractedTitleMatch?.[1]?.trim() || `Lecture Notes — ${body.videoId}`;
-
+    const finalTitle = resolveDocumentTitle(fullMarkdown, resolvedTitle);
     res.write(`data: ${JSON.stringify({ type: "done", markdown: fullMarkdown, title: finalTitle })}\n\n`);
     res.end();
   } catch (error: any) {

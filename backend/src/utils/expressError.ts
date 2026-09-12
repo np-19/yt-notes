@@ -1,15 +1,10 @@
-
-
-interface IExpressError extends Error {
-  status: number;
-  message: string;
+export class ExpressError extends Error {
+  constructor(
+    public override message: string,
+    public status: number,
+    public cause?: unknown
+  ) {
+    super(message);
+    this.name = 'ExpressError';
+  }
 }
-
-class ExpressError extends Error implements IExpressError {
-
-    constructor(public message: string, public status: number, public cause?: unknown) {
-        super(message);
-    }
-}
-
-export { ExpressError, type IExpressError };

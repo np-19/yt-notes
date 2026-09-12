@@ -1,4 +1,4 @@
-import type { NoteTheme, ThemeOption, Settings } from "../features/notes/types/notes.types";
+import type { ThemeOption } from "../features/notes/types/notes.types";
 
 export const NOTE_THEMES: ThemeOption[] = [
   {
@@ -47,11 +47,6 @@ export const NOTE_THEMES: ThemeOption[] = [
     bg: "#f3e8ff",
   },
 ];
-
-export const DEFAULT_SETTINGS: Settings = {
-  defaultTheme: "amber",
-  autoSavePdf: true,
-};
 
 export const QUICK_ACTIONS = [
   { id: "q1", label: "Kafka Architecture & Event Streaming" },

@@ -18,11 +18,6 @@ export interface NoteSettings {
   detailedMath: boolean;
 }
 
-export interface Settings {
-  defaultTheme: NoteTheme;
-  autoSavePdf: boolean;
-  noteSettings?: NoteSettings;
-}
 
 export interface NoteVersion {
   id: string;
