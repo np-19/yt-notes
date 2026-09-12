@@ -97,6 +97,45 @@ export async function fetchOEmbedMetadata(
   return { title: "", author: "" };
 }
 
+async function fetchAnyTranscript(api: YouTubeTranscriptApi, videoId: string): Promise<TranscriptEntry[]> {
+  try {
+    const list = await api.list(videoId);
+
+    // 1. Try finding English transcript
+    try {
+      const en = list.findTranscript(["en", "en-US", "en-GB"]);
+      return toEntries(await en.fetch());
+    } catch {
+      // ignore
+    }
+
+    // 2. Try any available transcript (e.g. 'hi' Hindi auto-generated)
+    for (const item of list) {
+      try {
+        // If translatable to English, translate it; otherwise fetch original language
+        if (item.isTranslatable) {
+          try {
+            return toEntries(await item.translate("en").fetch());
+          } catch {
+            // fall through to original
+          }
+        }
+        return toEntries(await item.fetch());
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // If list() fails or not available, try direct fetch
+    try {
+      return toEntries(await api.fetch(videoId));
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+}
+
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
   const pool = getProxies();
   const maxAttempts = pool.length > 0 ? Math.min(pool.length, 5) : 1;
@@ -108,11 +147,7 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const api = buildApi();
     try {
-      try {
-        transcript = toEntries(await api.fetch(videoId, { languages: ["en"] }));
-      } catch {
-        transcript = toEntries(await api.fetch(videoId));
-      }
+      transcript = await fetchAnyTranscript(api, videoId);
       if (transcript.length > 0) {
         console.log(`[yt.transcript] Successfully fetched ${transcript.length} transcript lines on attempt ${attempt + 1}`);
         break;
