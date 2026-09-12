@@ -221,16 +221,28 @@ async function fetchInnerTube(
       }
     );
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[yt.transcript/innertube] Client ${client.clientName} returned HTTP ${res.status}`);
+      return null;
+    }
 
     const data = (await res.json()) as any;
     const title: string = data?.videoDetails?.title || "";
     const author: string = data?.videoDetails?.author || "";
+    const playabilityStatus = data?.playabilityStatus?.status;
+
+    if (playabilityStatus && playabilityStatus !== "OK") {
+      console.warn(`[yt.transcript/innertube] Client ${client.clientName} playability: ${playabilityStatus} (${data?.playabilityStatus?.reason || "no reason"})`);
+    }
+
     const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
 
     if (!Array.isArray(tracks) || tracks.length === 0) {
+      console.log(`[yt.transcript/innertube] Client ${client.clientName} returned no caption tracks`);
       return { transcript: [], title, author };
     }
+
+    console.log(`[yt.transcript/innertube] Client ${client.clientName} found ${tracks.length} caption tracks`);
 
     const chosen =
       tracks.find((t: any) => t.languageCode === "en" || t.vssId?.includes(".en")) ||
@@ -239,12 +251,16 @@ async function fetchInnerTube(
     if (!chosen?.baseUrl) return { transcript: [], title, author };
 
     const trackRes = await proxyFetch(chosen.baseUrl);
-    if (!trackRes.ok) return { transcript: [], title, author };
+    if (!trackRes.ok) {
+      console.warn(`[yt.transcript/innertube] Failed to fetch caption XML from baseUrl: HTTP ${trackRes.status}`);
+      return { transcript: [], title, author };
+    }
 
     const xml = await trackRes.text();
     const transcript = parseTranscriptXml(xml, chosen.languageCode || "en");
     return { transcript, title, author };
-  } catch {
+  } catch (err: any) {
+    console.warn(`[yt.transcript/innertube] Client ${client.clientName} error:`, err?.message || err);
     return null;
   }
 }
@@ -262,8 +278,8 @@ export async function fetchOEmbedMetadata(
       const data = (await res.json()) as { title?: string; author_name?: string };
       return { title: data.title || "", author: data.author_name || "" };
     }
-  } catch {
-    // ignore
+  } catch (err: any) {
+    console.warn(`[yt.transcript/oembed] Failed to fetch oEmbed metadata for ${videoId}:`, err?.message || err);
   }
   return { title: "", author: "" };
 }
@@ -273,6 +289,8 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
   let author = "";
   let transcript: TranscriptEntry[] = [];
 
+  console.log(`[yt.transcript] Fetching details & transcript for video ${videoId} (proxy dispatchers: ${proxyAgents.length})`);
+
   // Try each InnerTube client in order until we get a transcript
   for (const client of INNERTUBE_CLIENTS) {
     if (transcript.length > 0) break;
@@ -281,14 +299,18 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
       if (!result) continue;
       if (!title && result.title) title = result.title;
       if (!author && result.author) author = result.author;
-      if (result.transcript.length > 0) transcript = result.transcript;
-    } catch {
-      // ignore — try next client
+      if (result.transcript.length > 0) {
+        transcript = result.transcript;
+        console.log(`[yt.transcript] Successfully retrieved ${transcript.length} lines via InnerTube client ${client.clientName}`);
+      }
+    } catch (err: any) {
+      console.warn(`[yt.transcript] InnerTube client ${client.clientName} failed:`, err?.message || err);
     }
   }
 
   // Fallback: youtube-transcript package (uses a completely different fetch strategy)
   if (transcript.length === 0) {
+    console.log(`[yt.transcript] InnerTube returned no transcript. Trying youtube-transcript fallback...`);
     try {
       const entries: TranscriptResponse[] = await fetchTranscript(videoId);
       if (entries.length > 0) {
@@ -298,8 +320,10 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
           offset: e.offset,
           lang: e.lang || "en",
         }));
+        console.log(`[yt.transcript] youtube-transcript fallback succeeded (${transcript.length} lines)`);
       }
-    } catch {
+    } catch (err: any) {
+      console.warn(`[yt.transcript] youtube-transcript fallback failed:`, err?.message || err);
       try {
         const entries: TranscriptResponse[] = await fetchTranscript(videoId, { lang: "en" });
         if (entries.length > 0) {
@@ -309,9 +333,10 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
             offset: e.offset,
             lang: "en",
           }));
+          console.log(`[yt.transcript] youtube-transcript fallback with lang:en succeeded (${transcript.length} lines)`);
         }
-      } catch {
-        // ignore
+      } catch (err2: any) {
+        console.warn(`[yt.transcript] youtube-transcript lang:en fallback failed:`, err2?.message || err2);
       }
     }
   }
