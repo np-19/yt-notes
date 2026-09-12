@@ -207,7 +207,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     const noteEl = document.querySelector('.note-content');
 
     if (isInsideSidePanel && noteEl) {
-      const printWindow = window.open('', '_blank', 'width=950,height=900');
+      const printWindow = window.open('', '_blank', 'width=1050,height=950');
       if (printWindow) {
         const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
           .map((el) => el.outerHTML)
@@ -226,66 +226,130 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       margin: 12mm 14mm;
     }
     html, body {
-      background: #ffffff !important;
-      color: #1c1917 !important;
+      background: #f1f5f9 !important;
+      color: #0f172a !important;
       margin: 0 !important;
       padding: 0 !important;
-      overflow: visible !important;
-      height: auto !important;
+      overflow-x: hidden !important;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .print-bar {
+      position: sticky;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 999999;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 3px solid #f59e0b;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    .print-btn {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #ffffff;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.4);
+      transition: all 0.15s ease;
+    }
+    .print-btn:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+    .floating-print-btn {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 999999;
+      background: #0f172a;
+      color: #ffffff;
+      border: 2px solid #f59e0b;
+      padding: 12px 20px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+      transition: all 0.15s ease;
+    }
+    .floating-print-btn:hover {
+      background: #1e293b;
+      transform: scale(1.04);
     }
     .note-content {
       width: 100% !important;
-      max-width: 100% !important;
-      margin: 0 !important;
-      box-shadow: none !important;
-      border: none !important;
-      padding: 0 !important;
+      max-width: 210mm !important;
+      margin: 24px auto !important;
+      background: #ffffff !important;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08) !important;
+      border: 1px solid #e2e8f0 !important;
+      padding: 36px 40px !important;
+      border-radius: 12px !important;
+      box-sizing: border-box !important;
     }
-    .no-print {
-      display: none !important;
-    }
-    .print-bar {
-      position: fixed;
-      top: 16px;
-      right: 16px;
-      z-index: 999999;
-      background: #1c1917;
-      color: #ffffff;
-      padding: 8px 16px;
-      border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      font-family: system-ui, sans-serif;
-      font-size: 13px;
-    }
-    .print-btn {
-      background: #d97706;
-      color: #ffffff;
-      border: none;
-      padding: 6px 14px;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
+    @media print {
+      body {
+        background: #ffffff !important;
+      }
+      .no-print, .print-bar, .floating-print-btn {
+        display: none !important;
+      }
+      .note-content {
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+      }
     }
   </style>
 </head>
 <body class="theme-${activeThemeId || 'amber'}">
   <div class="print-bar no-print">
-    <span>Ready to print</span>
-    <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-weight: 800; font-size: 16px; color: #ffffff; letter-spacing: -0.01em;">📄 YouTube Notes</span>
+      <span style="font-size: 12px; color: #94a3b8; background: #1e293b; padding: 3px 10px; border-radius: 6px; font-weight: 500;">A4 Document Ready</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button class="print-btn" onclick="window.print()">
+        🖨️ Print / Save as PDF
+      </button>
+      <button onclick="window.close()" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;">
+        ✕ Close
+      </button>
+    </div>
   </div>
+
+  <button class="floating-print-btn no-print" onclick="window.print()">
+    🖨️ Print / Save as PDF
+  </button>
+
   <div class="note-content">
     ${noteEl.innerHTML}
   </div>
+
   <script>
     setTimeout(function() {
       try {
         window.focus();
         window.print();
       } catch(e) {}
-    }, 300);
+    }, 400);
   <\/script>
 </body>
 </html>`);
