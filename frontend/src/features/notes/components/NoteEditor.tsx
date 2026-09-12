@@ -203,6 +203,22 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               const { svg } = await mermaid.render(id, cleanDiagram);
               targetContainer.innerHTML = svg;
               targetContainer.setAttribute('data-processed', 'true');
+
+              // Force direct inline centering on the container and rendered SVG
+              targetContainer.style.display = 'flex';
+              targetContainer.style.justifyContent = 'center';
+              targetContainer.style.alignItems = 'center';
+              targetContainer.style.margin = '24px auto';
+              targetContainer.style.width = '100%';
+              targetContainer.style.textAlign = 'center';
+
+              const svgEl = targetContainer.querySelector('svg');
+              if (svgEl) {
+                svgEl.style.display = 'block';
+                svgEl.style.marginLeft = 'auto';
+                svgEl.style.marginRight = 'auto';
+                svgEl.style.maxWidth = '100%';
+              }
             } catch (diagramErr) {
               console.warn('Skipping unparseable Mermaid diagram:', diagramErr);
               node.setAttribute('data-processed', 'true');
@@ -212,6 +228,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       } catch (e) {
         console.warn('Mermaid initialization error:', e);
       }
+
+      // 5. Force center on all flow diagrams
+      try {
+        const flowDiagrams = containerRef.current.querySelectorAll('.flow-diagram');
+        flowDiagrams.forEach((fd) => {
+          const el = fd as HTMLElement;
+          el.style.display = 'flex';
+          el.style.justifyContent = 'center';
+          el.style.alignItems = 'center';
+          el.style.margin = '20px auto';
+          el.style.width = '100%';
+        });
+      } catch (e) {}
     }
   }, [renderedHtml, activeTab, isEditing, activeThemeId]);
 
