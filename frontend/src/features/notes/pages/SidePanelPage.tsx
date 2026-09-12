@@ -45,16 +45,53 @@ export const SidePanelPage: React.FC = () => {
     window.parent.postMessage({ type: 'CLOSE_LECTURE_PANEL' }, '*');
   };
 
-  const handleOpenFullTab = (streamInTab = false) => {
+  const resolveTranscript = async (vId: string): Promise<Array<{ text: string; offset?: number; duration?: number; lang?: string }> | undefined> => {
+    if (!vId) return undefined;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      try {
+        const stored: { [key: string]: any } = await chrome.storage.local.get([`transcript_${vId}`]);
+        const candidate = stored[`transcript_${vId}`];
+        if (Array.isArray(candidate) && candidate.length > 0) {
+          return candidate;
+        }
+      } catch (e) {}
+    }
+
+    // If not in storage yet, request from parent window (content script)
+    return new Promise((resolve) => {
+      let resolved = false;
+      const msgHandler = (event: MessageEvent) => {
+        if (event.data?.type === 'CLIENT_TRANSCRIPT_RESULT' && event.data?.videoId === vId) {
+          window.removeEventListener('message', msgHandler);
+          resolved = true;
+          resolve(Array.isArray(event.data.transcript) && event.data.transcript.length > 0 ? event.data.transcript : undefined);
+        }
+      };
+
+      window.addEventListener('message', msgHandler);
+      window.parent.postMessage({ type: 'REQUEST_CLIENT_TRANSCRIPT', videoId: vId }, '*');
+
+      setTimeout(() => {
+        if (!resolved) {
+          window.removeEventListener('message', msgHandler);
+          resolve(undefined);
+        }
+      }, 1200);
+    });
+  };
+
+  const handleOpenFullTab = async (streamInTab = false) => {
     const studioBase = env.webStudioUrl.replace(/\/+$/, '');
 
     if (streamInTab) {
       const newNoteId = `note-${Date.now()}`;
+      const localTranscript = await resolveTranscript(videoId);
       const pendingDraft = {
         id: newNoteId,
         youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
         customTopic: customTopic || videoTitle || 'Synthesized Academic Notes',
         customPrompt: customPrompt || '',
+        transcript: localTranscript && localTranscript.length > 0 ? localTranscript : undefined,
         settings: {
           detailLevel,
           diagramDensity,
@@ -63,12 +100,15 @@ export const SidePanelPage: React.FC = () => {
           detailedMath,
         },
       };
-      try {
-        sessionStorage.setItem(`pending_note_gen_${newNoteId}`, JSON.stringify(pendingDraft));
-      } catch (e) {}
 
-      const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(customTopic || videoTitle)}&auto=1`;
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      try {
+        const draftPayload = encodeURIComponent(btoa(encodeURIComponent(JSON.stringify(pendingDraft))));
+        const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(customTopic || videoTitle)}&draft=${draftPayload}&auto=1`;
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      } catch (e) {
+        const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(customTopic || videoTitle)}&auto=1`;
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
     } else if (activeNote) {
       try {
         const payload = encodeURIComponent(btoa(encodeURIComponent(JSON.stringify(activeNote))));
@@ -104,41 +144,7 @@ export const SidePanelPage: React.FC = () => {
 
     const topicTitle = title || customTopic || (vId ? `Lecture Notes — ${vId}` : 'Synthesized Notes');
 
-    const resolveTranscript = async (): Promise<Array<{ text: string; offset?: number; duration?: number; lang?: string }> | undefined> => {
-      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-        try {
-          const stored: { [key: string]: any } = await chrome.storage.local.get([`transcript_${vId}`]);
-          const candidate = stored[`transcript_${vId}`];
-          if (Array.isArray(candidate) && candidate.length > 0) {
-            return candidate;
-          }
-        } catch (e) {}
-      }
-
-      // If not in storage yet, request from parent window (content script)
-      return new Promise((resolve) => {
-        let resolved = false;
-        const msgHandler = (event: MessageEvent) => {
-          if (event.data?.type === 'CLIENT_TRANSCRIPT_RESULT' && event.data?.videoId === vId) {
-            window.removeEventListener('message', msgHandler);
-            resolved = true;
-            resolve(Array.isArray(event.data.transcript) && event.data.transcript.length > 0 ? event.data.transcript : undefined);
-          }
-        };
-
-        window.addEventListener('message', msgHandler);
-        window.parent.postMessage({ type: 'REQUEST_CLIENT_TRANSCRIPT', videoId: vId }, '*');
-
-        setTimeout(() => {
-          if (!resolved) {
-            window.removeEventListener('message', msgHandler);
-            resolve(undefined);
-          }
-        }, 1200);
-      });
-    };
-
-    const localTranscript = await resolveTranscript();
+    const localTranscript = await resolveTranscript(vId);
 
     await notesApi.streamGenerateNotes(
       {
