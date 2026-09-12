@@ -11,55 +11,10 @@ export function extractYouTubeId(url: string): string | null {
   if (/^[A-Za-z0-9_-]{11}$/.test(url.trim())) return url.trim();
   return null;
 }
-
-type TranscriptEntry = { text: string; offset: number; duration: number; lang: string };
-
-const decodeEntities = (s: string) =>
-  s.replace(/&amp;/g, '&')
-   .replace(/&lt;/g, '<')
-   .replace(/&gt;/g, '>')
-   .replace(/&quot;/g, '"')
-   .replace(/&#39;/g, "'")
-   .replace(/&apos;/g, "'")
-   .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-   .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)));
-
-const parseTranscriptXml = (xml: string, lang = 'en'): TranscriptEntry[] => {
-  // New format: <p t="offsetMs" d="durMs"><s>word</s></p>
-  const newResults: TranscriptEntry[] = [];
-  const pRe = /<p\s+[^>]*\bt="(\d+)"[^>]*\bd="(\d+)"[^>]*>([\s\S]*?)<\/p>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = pRe.exec(xml)) !== null) {
-    const inner = m[3];
-    let text = '';
-    const sRe = /<s[^>]*>([^<]*)<\/s>/gi;
-    let sm: RegExpExecArray | null;
-    while ((sm = sRe.exec(inner)) !== null) text += sm[1];
-    if (!text) text = inner.replace(/<[^>]+>/g, '');
-    text = decodeEntities(text).trim();
-    if (text) newResults.push({ text, offset: parseInt(m[1], 10), duration: parseInt(m[2], 10), lang });
-  }
-  if (newResults.length > 0) return newResults;
-
-  // Classic format: <text start="s" dur="s">text</text>
-  const cRe = /<text\s+start="([^"]*)"\s+dur="([^"]*)"[^>]*>([^<]*)<\/text>/gi;
-  const classicResults: TranscriptEntry[] = [];
-  while ((m = cRe.exec(xml)) !== null) {
-    const text = decodeEntities(m[3]).trim();
-    if (text) classicResults.push({
-      text,
-      offset: Math.round(parseFloat(m[1]) * 1000),
-      duration: Math.round(parseFloat(m[2]) * 1000),
-      lang,
-    });
-  }
-  return classicResults;
-};
-
-// 1. Read transcript from chrome.storage (populated by extension content.js)
+// Read transcript from chrome.storage (populated by extension content.js when user is on a YouTube page)
 export const fetchBrowserTranscript = async (
   videoId: string
-): Promise<TranscriptEntry[] | undefined> => {
+): Promise<Array<{ text: string; offset: number; duration: number; lang: string }> | undefined> => {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       return new Promise((resolve) => {
@@ -69,58 +24,10 @@ export const fetchBrowserTranscript = async (
         });
       });
     }
-  } catch (err) {
+  } catch {
     // ignore
   }
   return undefined;
-};
-
-// 2. Fetch transcript directly from YouTube in the browser.
-//    Browser IPs are not datacenter IPs → far less likely to be rate-limited.
-//    Extension host_permissions (https://*/*) let this bypass CORS entirely.
-const fetchYouTubeTranscriptClientSide = async (
-  videoId: string
-): Promise<TranscriptEntry[] | undefined> => {
-  try {
-    // InnerTube WEB client — gets caption track list
-    const playerRes = await fetch(
-      'https://www.youtube.com/youtubei/v1/player?prettyPrint=false',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: {
-            client: { clientName: 'WEB', clientVersion: '2.20240101.01.00', hl: 'en', gl: 'US' },
-          },
-          videoId,
-        }),
-      }
-    );
-    if (!playerRes.ok) return undefined;
-
-    const data = await playerRes.json();
-    const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-    if (!Array.isArray(tracks) || tracks.length === 0) return undefined;
-
-    const chosen =
-      tracks.find((t: any) => t.languageCode === 'en' || t.vssId?.includes('.en')) || tracks[0];
-    if (!chosen?.baseUrl) return undefined;
-
-    const trackRes = await fetch(chosen.baseUrl);
-    if (!trackRes.ok) return undefined;
-
-    const xml = await trackRes.text();
-    const transcript = parseTranscriptXml(xml, chosen.languageCode || 'en');
-
-    // Cache in chrome.storage so future requests skip this fetch
-    if (transcript.length > 0 && typeof chrome !== 'undefined' && chrome.storage?.local) {
-      try { chrome.storage.local.set({ [`transcript_${videoId}`]: transcript }); } catch (_) {}
-    }
-
-    return transcript.length > 0 ? transcript : undefined;
-  } catch (e) {
-    return undefined; // CORS blocked outside extension, or network error — server will try its own fetch
-  }
 };
 
 const getSavedLocalNotes = (): Note[] => {
@@ -171,15 +78,11 @@ async function buildNotePayload(params: GenerateNotesParams) {
 
   let titleCandidate = params.customTopic?.trim() || `Lecture Notes — ${videoId}`;
 
-  // Transcript priority: caller-supplied → chrome.storage (extension) → browser InnerTube fetch → let server handle it
-  let effectiveTranscript: TranscriptEntry[] | undefined =
+  // Transcript priority: chrome.storage (extension) → let server handle it
+  const effectiveTranscript =
     params.transcript && params.transcript.length > 0
-      ? params.transcript.map((e) => ({ text: e.text, offset: e.offset ?? 0, duration: e.duration ?? 0, lang: e.lang ?? 'en' }))
-      : undefined;
-
-
-  if (!effectiveTranscript) effectiveTranscript = await fetchBrowserTranscript(videoId);
-  if (!effectiveTranscript) effectiveTranscript = await fetchYouTubeTranscriptClientSide(videoId);
+      ? params.transcript
+      : await fetchBrowserTranscript(videoId);
 
   return {
     videoId,
