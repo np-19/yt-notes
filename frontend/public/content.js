@@ -46,10 +46,23 @@
     panelContainer.appendChild(panelIframe);
     document.body.appendChild(panelContainer);
 
-    // Listen for close messages from inside iframe
-    window.addEventListener("message", (event) => {
+    // Listen for messages from inside iframe
+    window.addEventListener("message", async (event) => {
       if (event.data?.type === "CLOSE_LECTURE_PANEL") {
         closeSidePanel();
+      } else if (event.data?.type === "REQUEST_CLIENT_TRANSCRIPT") {
+        const vId = event.data?.videoId;
+        if (vId) {
+          const transcript = await fetchClientTranscript(vId);
+          panelIframe?.contentWindow?.postMessage(
+            {
+              type: "CLIENT_TRANSCRIPT_RESULT",
+              videoId: vId,
+              transcript: transcript || [],
+            },
+            "*"
+          );
+        }
       }
     });
   };
@@ -65,7 +78,7 @@
       const targetUrl = chrome.runtime.getURL(
         `index.html#/sidepanel?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(videoTitle)}`
       );
-      
+
       if (panelIframe && panelIframe.src !== targetUrl) {
         panelIframe.src = targetUrl;
       }
@@ -80,6 +93,9 @@
         floatBtn.style.opacity = "0.7";
         floatBtn.textContent = "📖 Notes Open";
       }
+
+      // Pre-extract transcript
+      fetchClientTranscript(videoId);
     } catch (e) {
       console.warn("Failed to open side panel:", e);
     }
@@ -98,29 +114,31 @@
     }
   };
 
-  const fetchClientTranscript = async (videoId) => {
+  // Ask page-bridge (MAIN world) for internal player caption tracks
+  const getTracksFromPageBridge = (videoId) => {
+    return new Promise((resolve) => {
+      const handler = (e) => {
+        if (e.data?.type === "YT_CAPTIONS_TRACK_RESPONSE" && e.data.videoId === videoId) {
+          window.removeEventListener("message", handler);
+          resolve(e.data.tracks || []);
+        }
+      };
+      window.addEventListener("message", handler);
+      window.postMessage({ type: "GET_YT_CAPTIONS_TRACK", videoId }, "*");
+      setTimeout(() => {
+        window.removeEventListener("message", handler);
+        resolve([]);
+      }, 1500);
+    });
+  };
+
+  const parseTimedTextXml = (xml, lang = "en") => {
     try {
-      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: "omit" });
-      const html = await pageRes.text();
-      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
-      if (!captionMatch) return null;
-
-      const tracks = JSON.parse(captionMatch[1]);
-      if (!Array.isArray(tracks) || tracks.length === 0) return null;
-
-      const chosen =
-        tracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
-        tracks[0];
-
-      if (!chosen || !chosen.baseUrl) return null;
-
-      const timedTextRes = await fetch(chosen.baseUrl);
-      const xml = await timedTextRes.text();
       const parser = new DOMParser();
       const doc = parser.parseFromString(xml, "text/xml");
       const textElements = Array.from(doc.querySelectorAll("text"));
 
-      const transcript = textElements
+      return textElements
         .map((el) => {
           const raw = el.textContent || "";
           return {
@@ -134,16 +152,58 @@
               .trim(),
             offset: Math.round(parseFloat(el.getAttribute("start") || "0") * 1000),
             duration: Math.round(parseFloat(el.getAttribute("dur") || "0") * 1000),
-            lang: chosen.languageCode || "en",
+            lang,
           };
         })
         .filter((entry) => Boolean(entry.text));
+    } catch (err) {
+      return [];
+    }
+  };
 
-      if (transcript.length > 0) {
-        if (chrome.storage?.local) {
-          chrome.storage.local.set({ [`transcript_${videoId}`]: transcript });
+  const fetchClientTranscript = async (videoId) => {
+    try {
+      // 1. Try getting caption tracks via page bridge (playerResponse / movie_player)
+      const tracks = await getTracksFromPageBridge(videoId);
+      if (Array.isArray(tracks) && tracks.length > 0) {
+        const chosen =
+          tracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
+          tracks[0];
+        if (chosen && chosen.baseUrl) {
+          const timedTextRes = await fetch(chosen.baseUrl);
+          const xml = await timedTextRes.text();
+          const parsed = parseTimedTextXml(xml, chosen.languageCode || "en");
+          if (parsed.length > 0) {
+            if (chrome.storage?.local) {
+              chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
+            }
+            return parsed;
+          }
         }
-        return transcript;
+      }
+
+      // 2. Fallback: fetch YouTube page directly in browser context
+      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: "omit" });
+      const html = await pageRes.text();
+      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+      if (captionMatch) {
+        const fallbackTracks = JSON.parse(captionMatch[1]);
+        if (Array.isArray(fallbackTracks) && fallbackTracks.length > 0) {
+          const chosen =
+            fallbackTracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
+            fallbackTracks[0];
+          if (chosen && chosen.baseUrl) {
+            const timedTextRes = await fetch(chosen.baseUrl);
+            const xml = await timedTextRes.text();
+            const parsed = parseTimedTextXml(xml, chosen.languageCode || "en");
+            if (parsed.length > 0) {
+              if (chrome.storage?.local) {
+                chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
+              }
+              return parsed;
+            }
+          }
+        }
       }
     } catch (e) {
       console.warn("Client transcript extraction error:", e);
@@ -167,7 +227,7 @@
     const title = document.querySelector("h1.ytd-watch-metadata")?.textContent?.trim() || document.title.replace(" - YouTube", "");
     const channel = document.querySelector("#channel-name a")?.textContent?.trim() || "";
     const currentVideo = { id, title, channel, thumbnail: `https://i.ytimg.com/vi/${id}/hqdefault.jpg` };
-    
+
     try {
       if (chrome.storage?.local) {
         chrome.storage.local.set({ currentVideo });
@@ -203,9 +263,15 @@
       align-items: center;
       gap: 8px;
     `;
-    
-    button.onmouseover = () => { button.style.backgroundColor = "#b45309"; button.style.transform = "scale(1.04)"; };
-    button.onmouseout = () => { button.style.backgroundColor = "#d97706"; button.style.transform = "scale(1)"; };
+
+    button.onmouseover = () => {
+      button.style.backgroundColor = "#b45309";
+      button.style.transform = "scale(1.04)";
+    };
+    button.onmouseout = () => {
+      button.style.backgroundColor = "#d97706";
+      button.style.transform = "scale(1)";
+    };
 
     button.addEventListener("click", (e) => {
       e.preventDefault();

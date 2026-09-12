@@ -23,6 +23,16 @@
         "https://www.youtube.com/watch*"
       ],
       "js": [
+        "page-bridge.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/watch*"
+      ],
+      "js": [
         "content.js"
       ],
       "run_at": "document_idle"

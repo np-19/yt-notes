@@ -98,16 +98,41 @@ export const SidePanelPage: React.FC = () => {
 
     const topicTitle = title || customTopic || (vId ? `Lecture Notes — ${vId}` : 'Synthesized Notes');
 
-    let localTranscript: Array<{ text: string; offset?: number; duration?: number; lang?: string }> | undefined = undefined;
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      try {
-        const stored: { [key: string]: any } = await chrome.storage.local.get([`transcript_${vId}`]);
-        const candidate = stored[`transcript_${vId}`];
-        if (Array.isArray(candidate) && candidate.length > 0) {
-          localTranscript = candidate;
-        }
-      } catch (e) {}
-    }
+    const resolveTranscript = async (): Promise<Array<{ text: string; offset?: number; duration?: number; lang?: string }> | undefined> => {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        try {
+          const stored: { [key: string]: any } = await chrome.storage.local.get([`transcript_${vId}`]);
+          const candidate = stored[`transcript_${vId}`];
+          if (Array.isArray(candidate) && candidate.length > 0) {
+            return candidate;
+          }
+        } catch (e) {}
+      }
+
+      // If not in storage yet, request from parent window (content script)
+      return new Promise((resolve) => {
+        let resolved = false;
+        const msgHandler = (event: MessageEvent) => {
+          if (event.data?.type === 'CLIENT_TRANSCRIPT_RESULT' && event.data?.videoId === vId) {
+            window.removeEventListener('message', msgHandler);
+            resolved = true;
+            resolve(Array.isArray(event.data.transcript) && event.data.transcript.length > 0 ? event.data.transcript : undefined);
+          }
+        };
+
+        window.addEventListener('message', msgHandler);
+        window.parent.postMessage({ type: 'REQUEST_CLIENT_TRANSCRIPT', videoId: vId }, '*');
+
+        setTimeout(() => {
+          if (!resolved) {
+            window.removeEventListener('message', msgHandler);
+            resolve(undefined);
+          }
+        }, 1200);
+      });
+    };
+
+    const localTranscript = await resolveTranscript();
 
     await notesApi.streamGenerateNotes(
       {
