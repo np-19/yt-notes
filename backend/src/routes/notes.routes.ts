@@ -37,25 +37,26 @@ async function prepareSynthesisContext(body: NotePayload) {
   let resolvedTitle = body.videoTitle;
 
   if (transcript.length === 0 || !resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-    const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
-    if (transcript.length === 0 && videoInfo.transcript.length > 0) {
-      transcript = videoInfo.transcript;
-    }
-    if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-      resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
+    try {
+      const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
+      if (transcript.length === 0 && videoInfo.transcript.length > 0) {
+        transcript = videoInfo.transcript;
+      }
+      if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+        resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
+      }
+    } catch (e) {
+      console.warn(`[notes.routes] Could not fetch details from YouTube scraper:`, e);
     }
   }
 
-  if (!transcript || transcript.length === 0) {
-    throw new ExpressError(
-      "A transcript is not available for this video. Please ensure the video has closed captions (CC) or subtitles enabled on YouTube.",
-      422
-    );
-  }
+  const finalTitle = resolvedTitle && !resolvedTitle.startsWith("Lecture Notes —")
+    ? resolvedTitle
+    : `YouTube Lecture (${body.videoId})`;
 
   return {
     transcript,
-    resolvedTitle: resolvedTitle || `Lecture Notes — ${body.videoId}`,
+    resolvedTitle: finalTitle,
   };
 }
 
