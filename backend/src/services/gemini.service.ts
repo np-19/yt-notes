@@ -17,7 +17,7 @@ function getGenAI() {
   return new GoogleGenerativeAI(GeminiApiKey);
 }
 
-async function executeWithModelFallback<T>(
+export async function executeWithModelFallback<T>(
   actionName: string,
   fn: (model: any) => Promise<T | null | undefined>
 ): Promise<T> {
