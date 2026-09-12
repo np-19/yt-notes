@@ -1,4 +1,4 @@
-import { YouTubeTranscriptApi } from "@hallelx/youtube-transcript";
+import { YouTubeTranscriptApi, WebshareProxyConfig } from "@hallelx/youtube-transcript";
 
 export type TranscriptEntry = {
   text: string;
@@ -14,6 +14,37 @@ export type VideoInfo = {
   transcript: TranscriptEntry[];
   hasSubtitles: boolean;
 };
+
+function buildApi(): YouTubeTranscriptApi {
+  const username = process.env.WEBSHARE_PROXY_USERNAME;
+  const password = process.env.WEBSHARE_PROXY_PASSWORD;
+
+  if (username && password) {
+    return new YouTubeTranscriptApi({
+      proxyConfig: new WebshareProxyConfig({
+        proxyUsername: username,
+        proxyPassword: password,
+      }),
+    });
+  }
+
+  return new YouTubeTranscriptApi();
+}
+
+// Lazily build once (picks up env vars after dotenv loads)
+let _api: YouTubeTranscriptApi | null = null;
+const getApi = () => {
+  if (!_api) _api = buildApi();
+  return _api;
+};
+
+const toEntries = (fetched: Awaited<ReturnType<YouTubeTranscriptApi["fetch"]>>): TranscriptEntry[] =>
+  fetched.snippets.map((s) => ({
+    text: s.text,
+    offset: Math.round(s.start * 1000),
+    duration: Math.round(s.duration * 1000),
+    lang: fetched.languageCode || "en",
+  }));
 
 export async function fetchOEmbedMetadata(
   videoId: string
@@ -33,30 +64,16 @@ export async function fetchOEmbedMetadata(
 }
 
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
-  const api = new YouTubeTranscriptApi();
-
+  const api = getApi();
   let transcript: TranscriptEntry[] = [];
 
   try {
-    const fetched = await api.fetch(videoId, { languages: ['en'] });
-    transcript = fetched.snippets.map((s) => ({
-      text: s.text,
-      offset: Math.round(s.start * 1000),
-      duration: Math.round(s.duration * 1000),
-      lang: fetched.languageCode || 'en',
-    }));
+    transcript = toEntries(await api.fetch(videoId, { languages: ["en"] }));
   } catch {
-    // Try without language preference
     try {
-      const fetched = await api.fetch(videoId);
-      transcript = fetched.snippets.map((s) => ({
-        text: s.text,
-        offset: Math.round(s.start * 1000),
-        duration: Math.round(s.duration * 1000),
-        lang: fetched.languageCode || 'en',
-      }));
+      transcript = toEntries(await api.fetch(videoId));
     } catch {
-      // No transcript available
+      // No transcript available — caller will surface the error
     }
   }
 
