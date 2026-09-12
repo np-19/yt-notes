@@ -244,23 +244,53 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     .no-print {
       display: none !important;
     }
+    .print-bar {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 999999;
+      background: #1c1917;
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+    }
+    .print-btn {
+      background: #d97706;
+      color: #ffffff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body class="theme-${activeThemeId || 'amber'}">
+  <div class="print-bar no-print">
+    <span>Ready to print</span>
+    <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
   <div class="note-content">
     ${noteEl.innerHTML}
   </div>
   <script>
-    window.addEventListener('load', () => {
-      setTimeout(() => {
+    setTimeout(function() {
+      try {
+        window.focus();
         window.print();
-        setTimeout(() => window.close(), 1000);
-      }, 400);
-    });
+      } catch(e) {}
+    }, 300);
   <\/script>
 </body>
 </html>`);
         printWindow.document.close();
+        printWindow.focus();
         return;
       }
     }
