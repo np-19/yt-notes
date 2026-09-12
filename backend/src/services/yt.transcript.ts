@@ -1,9 +1,5 @@
 import "../configs/constants.js";
-import {
-  YouTubeTranscriptApi,
-  GenericProxyConfig,
-  WebshareProxyConfig,
-} from "@hallelx/youtube-transcript";
+import { YouTubeTranscriptApi, WebshareProxyConfig } from "@hallelx/youtube-transcript";
 
 export type TranscriptEntry = {
   text: string;
@@ -21,64 +17,22 @@ export type VideoInfo = {
 };
 
 // ── Proxy configuration ───────────────────────────────────────────────────
-// Supports:
-// 1. Webshare rotating residential proxy (WEBSHARE_PROXY_USERNAME & WEBSHARE_PROXY_PASSWORD)
-// 2. Generic proxy list / static IPs (YOUTUBE_PROXY_URL / YOUTUBE_PROXIES)
 
-function parseProxyUrl(entry: string): string | null {
-  const s = entry.trim();
-  if (!s) return null;
-  if (/^https?:\/\//i.test(s) || /^socks5:\/\//i.test(s)) return s;
-  const parts = s.split(":");
-  if (parts.length === 4 && parts[0] && parts[1] && parts[2] && parts[3]) {
-    const [ip, port, user, pass] = parts;
-    return `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${ip}:${port}`;
-  }
-  return `http://${s}`;
-}
+function buildApi(): YouTubeTranscriptApi {
+  const proxyUsername = process.env.WEBSHARE_PROXY_USERNAME;
+  const proxyPassword = process.env.WEBSHARE_PROXY_PASSWORD;
 
-function loadProxies(): string[] {
-  const raw =
-    process.env.YOUTUBE_PROXY_URL ||
-    process.env.YOUTUBE_PROXIES ||
-    process.env.HTTPS_PROXY ||
-    process.env.HTTP_PROXY ||
-    "";
-  return raw
-    .split(/[\r\n,]+/)
-    .map(parseProxyUrl)
-    .filter((u): u is string => u !== null && u.length > 0);
-}
-
-let proxyIndex = 0;
-
-function getProxyConfig(): GenericProxyConfig | WebshareProxyConfig | undefined {
-  const webshareUser = process.env.WEBSHARE_PROXY_USERNAME;
-  const websharePass = process.env.WEBSHARE_PROXY_PASSWORD;
-
-  if (webshareUser && websharePass) {
-    return new WebshareProxyConfig({
-      proxyUsername: webshareUser,
-      proxyPassword: websharePass,
-      retriesWhenBlocked: 10,
+  if (proxyUsername && proxyPassword) {
+    return new YouTubeTranscriptApi({
+      proxyConfig: new WebshareProxyConfig({
+        proxyUsername,
+        proxyPassword,
+        retriesWhenBlocked: 10,
+      }),
     });
   }
 
-  const proxies = loadProxies();
-  if (proxies.length === 0) return undefined;
-
-  const url = proxies[proxyIndex % proxies.length];
-  if (!url) return undefined;
-  proxyIndex = (proxyIndex + 1) % proxies.length;
-
-  return new GenericProxyConfig({ httpUrl: url, httpsUrl: url });
-}
-
-function buildApi(): YouTubeTranscriptApi {
-  const proxyConfig = getProxyConfig();
-  return proxyConfig
-    ? new YouTubeTranscriptApi({ proxyConfig })
-    : new YouTubeTranscriptApi();
+  return new YouTubeTranscriptApi();
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -113,7 +67,6 @@ export async function fetchOEmbedMetadata(
 }
 
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
-  // Each call picks the next proxy in the pool (round-robin)
   const api = buildApi();
   let transcript: TranscriptEntry[] = [];
 
