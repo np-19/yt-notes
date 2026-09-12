@@ -1,3 +1,4 @@
+import "../configs/constants.js";
 import { YouTubeTranscriptApi, GenericProxyConfig } from "@hallelx/youtube-transcript";
 
 export type TranscriptEntry = {
@@ -23,9 +24,9 @@ function parseProxyUrl(entry: string): string | null {
   if (!s) return null;
   if (/^https?:\/\//i.test(s) || /^socks5:\/\//i.test(s)) return s;
   const parts = s.split(":");
-  if (parts.length === 4) {
+  if (parts.length === 4 && parts[0] && parts[1] && parts[2] && parts[3]) {
     const [ip, port, user, pass] = parts;
-    return `http://${user}:${pass}@${ip}:${port}`;
+    return `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${ip}:${port}`;
   }
   return `http://${s}`;
 }
@@ -40,13 +41,17 @@ function loadProxies(): string[] {
   return raw
     .split(/[\r\n,]+/)
     .map(parseProxyUrl)
-    .filter((u): u is string => u !== null);
+    .filter((u): u is string => u !== null && u.length > 0);
 }
 
-const proxies = loadProxies();
+function getProxies(): string[] {
+  return loadProxies();
+}
+
 let proxyIndex = 0;
 
 function getNextProxyConfig(): GenericProxyConfig | undefined {
+  const proxies = getProxies();
   if (proxies.length === 0) return undefined;
   const url = proxies[proxyIndex % proxies.length];
   if (!url) return undefined;
@@ -54,8 +59,8 @@ function getNextProxyConfig(): GenericProxyConfig | undefined {
   return new GenericProxyConfig({ httpUrl: url, httpsUrl: url });
 }
 
-function buildApi(): YouTubeTranscriptApi {
-  const proxy = getNextProxyConfig();
+function buildApi(proxyConfig?: GenericProxyConfig): YouTubeTranscriptApi {
+  const proxy = proxyConfig ?? getNextProxyConfig();
   return proxy
     ? new YouTubeTranscriptApi({ proxyConfig: proxy })
     : new YouTubeTranscriptApi();
