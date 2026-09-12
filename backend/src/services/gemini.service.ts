@@ -4,12 +4,19 @@ import { ExpressError } from "../utils/expressError.js";
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "./yt.transcript.js";
 
-const MODEL_CANDIDATES = [
-  GeminiModel || "gemini-3.7-flash",
-  "gemini-3.7-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-flash-latest",
-  "gemini-3.6-flash",
+const FAST_LOW_COST_MODELS = [
+  "gemini-2.0-flash-lite-preview-02-05",
+  "gemini-2.0-flash-lite",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-flash",
+  "gemini-2.0-flash",
+];
+
+const SYNTHESIS_MODELS = [
+  GeminiModel || "gemini-2.0-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-pro",
 ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
 function getGenAI() {
@@ -19,12 +26,13 @@ function getGenAI() {
 
 export async function executeWithModelFallback<T>(
   actionName: string,
-  fn: (model: any) => Promise<T | null | undefined>
+  fn: (model: any) => Promise<T | null | undefined>,
+  candidates: string[] = SYNTHESIS_MODELS
 ): Promise<T> {
   const ai = getGenAI();
   let lastError: any = null;
 
-  for (const modelName of MODEL_CANDIDATES) {
+  for (const modelName of candidates) {
     try {
       const model = ai.getGenerativeModel({ model: modelName });
       const result = await fn(model);
@@ -37,6 +45,8 @@ export async function executeWithModelFallback<T>(
 
   throw new ExpressError(`The AI service encountered an error (${actionName}): ${lastError?.message || "All models failed."}`, 502, lastError);
 }
+
+export { FAST_LOW_COST_MODELS };
 
 function buildNotesPrompt(
   videoId: string,

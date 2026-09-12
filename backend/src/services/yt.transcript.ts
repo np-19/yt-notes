@@ -1,4 +1,4 @@
-import { executeWithModelFallback } from "./gemini.service.js";
+import { executeWithModelFallback, FAST_LOW_COST_MODELS } from "./gemini.service.js";
 
 export type TranscriptEntry = {
   text: string;
@@ -14,7 +14,9 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<{
   transcript: TranscriptEntry[];
   hasSubtitles: boolean;
 }> {
-  return executeWithModelFallback("getVideoDetailsAndTranscript", async (model) => {
+  return executeWithModelFallback(
+    "getVideoDetailsAndTranscript",
+    async (model) => {
     const prompt = `You are a YouTube video transcription and metadata extraction engine.
 YouTube Video ID: "${videoId}"
 
@@ -54,5 +56,5 @@ Provide 20-30 chronological transcript segments. Output ONLY raw JSON.`;
       transcript,
       hasSubtitles: transcript.length > 0,
     };
-  });
+  }, FAST_LOW_COST_MODELS);
 }
