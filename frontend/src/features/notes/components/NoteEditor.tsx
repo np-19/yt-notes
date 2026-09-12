@@ -213,10 +213,10 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           .map((el) => el.outerHTML)
           .join('\n');
 
-        printWindow.document.write(`<!DOCTYPE html>
+        const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>${note.title || 'Lecture Study Notes'}</title>
+  <title>${(note.title || 'Lecture Study Notes').replace(/"/g, '&quot;')}</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   ${styles}
@@ -248,7 +248,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       border-bottom: 3px solid #f59e0b;
       box-shadow: 0 4px 20px rgba(0,0,0,0.3);
     }
-    .print-btn {
+    .print-action-btn {
       background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
       color: #ffffff;
       border: none;
@@ -262,12 +262,28 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       gap: 8px;
       box-shadow: 0 2px 10px rgba(245, 158, 11, 0.4);
       transition: all 0.15s ease;
+      user-select: none;
     }
-    .print-btn:hover {
+    .print-action-btn:hover {
       filter: brightness(1.1);
       transform: translateY(-1px);
     }
-    .floating-print-btn {
+    .close-action-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+    }
+    .close-action-btn:hover {
+      background: #334155;
+      color: #ffffff;
+    }
+    .floating-print-action-btn {
       position: fixed;
       bottom: 28px;
       right: 28px;
@@ -285,8 +301,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       gap: 8px;
       box-shadow: 0 6px 20px rgba(0,0,0,0.35);
       transition: all 0.15s ease;
+      user-select: none;
     }
-    .floating-print-btn:hover {
+    .floating-print-action-btn:hover {
       background: #1e293b;
       transform: scale(1.04);
     }
@@ -305,7 +322,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       body {
         background: #ffffff !important;
       }
-      .no-print, .print-bar, .floating-print-btn {
+      .no-print, .print-bar, .floating-print-action-btn {
         display: none !important;
       }
       .note-content {
@@ -326,35 +343,56 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       <span style="font-size: 12px; color: #94a3b8; background: #1e293b; padding: 3px 10px; border-radius: 6px; font-weight: 500;">A4 Document Ready</span>
     </div>
     <div style="display: flex; align-items: center; gap: 12px;">
-      <button class="print-btn" onclick="window.print()">
+      <button class="print-action-btn" id="top-print-btn">
         🖨️ Print / Save as PDF
       </button>
-      <button onclick="window.close()" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;">
+      <button class="close-action-btn" id="top-close-btn">
         ✕ Close
       </button>
     </div>
   </div>
 
-  <button class="floating-print-btn no-print" onclick="window.print()">
+  <button class="floating-print-action-btn no-print" id="floating-print-btn">
     🖨️ Print / Save as PDF
   </button>
 
   <div class="note-content">
     ${noteEl.innerHTML}
   </div>
-
-  <script>
-    setTimeout(function() {
-      try {
-        window.focus();
-        window.print();
-      } catch(e) {}
-    }, 400);
-  <\/script>
 </body>
-</html>`);
+</html>`;
+
+        printWindow.document.open();
+        printWindow.document.write(html);
         printWindow.document.close();
-        printWindow.focus();
+
+        // Programmatically attach click handlers directly on DOM elements
+        const doPrint = () => {
+          try {
+            printWindow.focus();
+            printWindow.print();
+          } catch (err) {
+            console.error('Print trigger failed:', err);
+          }
+        };
+
+        const topBtn = printWindow.document.getElementById('top-print-btn');
+        if (topBtn) topBtn.addEventListener('click', doPrint);
+
+        const floatBtn = printWindow.document.getElementById('floating-print-btn');
+        if (floatBtn) floatBtn.addEventListener('click', doPrint);
+
+        const closeBtn = printWindow.document.getElementById('top-close-btn');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => {
+            printWindow.close();
+          });
+        }
+
+        setTimeout(() => {
+          doPrint();
+        }, 500);
+
         return;
       }
     }
