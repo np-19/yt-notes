@@ -37,26 +37,18 @@ async function prepareSynthesisContext(body: NotePayload) {
   let resolvedTitle = body.videoTitle;
 
   if (transcript.length === 0 || !resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-    try {
-      const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
-      if (transcript.length === 0 && videoInfo.transcript.length > 0) {
-        transcript = videoInfo.transcript;
-      }
-      if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-        resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
-      }
-    } catch (e) {
-      console.warn(`[notes.routes] Could not fetch details from YouTube scraper:`, e);
+    const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
+    if (transcript.length === 0 && videoInfo.transcript.length > 0) {
+      transcript = videoInfo.transcript;
+    }
+    if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+      resolvedTitle = videoInfo.title;
     }
   }
 
-  const finalTitle = resolvedTitle && !resolvedTitle.startsWith("Lecture Notes —")
-    ? resolvedTitle
-    : `YouTube Lecture (${body.videoId})`;
-
   return {
     transcript,
-    resolvedTitle: finalTitle,
+    resolvedTitle: resolvedTitle || `YouTube Lecture (${body.videoId})`,
   };
 }
 
