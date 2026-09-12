@@ -1,4 +1,4 @@
-import { YouTubeTranscriptApi, WebshareProxyConfig } from "@hallelx/youtube-transcript";
+import { YouTubeTranscriptApi, GenericProxyConfig } from "@hallelx/youtube-transcript";
 
 export type TranscriptEntry = {
   text: string;
@@ -15,36 +15,65 @@ export type VideoInfo = {
   hasSubtitles: boolean;
 };
 
-function buildApi(): YouTubeTranscriptApi {
-  const username = process.env.WEBSHARE_PROXY_USERNAME;
-  const password = process.env.WEBSHARE_PROXY_PASSWORD;
+// ── Proxy pool ─────────────────────────────────────────────────────────────
+// Parses "ip:port:user:pass" or any http(s):// / socks5:// URL
 
-  if (username && password) {
-    return new YouTubeTranscriptApi({
-      proxyConfig: new WebshareProxyConfig({
-        proxyUsername: username,
-        proxyPassword: password,
-      }),
-    });
+function parseProxyUrl(entry: string): string | null {
+  const s = entry.trim();
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s) || /^socks5:\/\//i.test(s)) return s;
+  const parts = s.split(":");
+  if (parts.length === 4) {
+    const [ip, port, user, pass] = parts;
+    return `http://${user}:${pass}@${ip}:${port}`;
   }
-
-  return new YouTubeTranscriptApi();
+  return `http://${s}`;
 }
 
-// Lazily build once (picks up env vars after dotenv loads)
-let _api: YouTubeTranscriptApi | null = null;
-const getApi = () => {
-  if (!_api) _api = buildApi();
-  return _api;
-};
+function loadProxies(): string[] {
+  const raw =
+    process.env.YOUTUBE_PROXY_URL ||
+    process.env.YOUTUBE_PROXIES ||
+    process.env.HTTPS_PROXY ||
+    process.env.HTTP_PROXY ||
+    "";
+  return raw
+    .split(/[\r\n,]+/)
+    .map(parseProxyUrl)
+    .filter((u): u is string => u !== null);
+}
 
-const toEntries = (fetched: Awaited<ReturnType<YouTubeTranscriptApi["fetch"]>>): TranscriptEntry[] =>
+const proxies = loadProxies();
+let proxyIndex = 0;
+
+function getNextProxyConfig(): GenericProxyConfig | undefined {
+  if (proxies.length === 0) return undefined;
+  const url = proxies[proxyIndex % proxies.length];
+  if (!url) return undefined;
+  proxyIndex = (proxyIndex + 1) % proxies.length;
+  return new GenericProxyConfig({ httpUrl: url, httpsUrl: url });
+}
+
+function buildApi(): YouTubeTranscriptApi {
+  const proxy = getNextProxyConfig();
+  return proxy
+    ? new YouTubeTranscriptApi({ proxyConfig: proxy })
+    : new YouTubeTranscriptApi();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+const toEntries = (
+  fetched: Awaited<ReturnType<YouTubeTranscriptApi["fetch"]>>
+): TranscriptEntry[] =>
   fetched.snippets.map((s) => ({
     text: s.text,
     offset: Math.round(s.start * 1000),
     duration: Math.round(s.duration * 1000),
     lang: fetched.languageCode || "en",
   }));
+
+// ── Public API ─────────────────────────────────────────────────────────────
 
 export async function fetchOEmbedMetadata(
   videoId: string
@@ -64,7 +93,8 @@ export async function fetchOEmbedMetadata(
 }
 
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
-  const api = getApi();
+  // Each call picks the next proxy in the pool (round-robin)
+  const api = buildApi();
   let transcript: TranscriptEntry[] = [];
 
   try {
@@ -73,7 +103,7 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
     try {
       transcript = toEntries(await api.fetch(videoId));
     } catch {
-      // No transcript available — caller will surface the error
+      // No transcript available
     }
   }
 
