@@ -2,20 +2,37 @@ import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { FrontendUrl, Port } from "./configs/constants.js";
+import { AllowedFrontendOrigins, FrontendUrl, Port } from "./configs/constants.js";
 import notesRouter from "./routes/notes.routes.js";
 import { ExpressError } from "./utils/expressError.js";
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: (origin, callback) => {
-  const isLocalDevelopment = origin ? /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) : false;
-  if (!origin || origin === FrontendUrl || isLocalDevelopment || origin.startsWith("chrome-extension://")) return callback(null, true);
-  return callback(new ExpressError("This origin is not allowed.", 403));
-} }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow non-browser requests or same-origin requests
+      if (!origin) return callback(null, true);
+
+      const normalizedOrigin = origin.replace(/\/+$/, "");
+      const isLocalDevelopment = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin);
+      const isChromeExtension = origin.startsWith("chrome-extension://") || origin.startsWith("moz-extension://");
+      const isVercelDomain = /^https:\/\/[a-zA-Z0-9-_.]+\.vercel\.app$/.test(origin);
+      const isAllowedOrigin =
+        AllowedFrontendOrigins.includes(normalizedOrigin) || normalizedOrigin === FrontendUrl.replace(/\/+$/, "");
+
+      if (isAllowedOrigin || isLocalDevelopment || isChromeExtension || isVercelDomain) {
+        return callback(null, true);
+      }
+
+      return callback(new ExpressError(`Origin ${origin} is not allowed by CORS.`, 403));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "1mb" }));
 app.use(rateLimit({ windowMs: 60_000, limit: 30, standardHeaders: "draft-7", legacyHeaders: false }));
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 app.use("/api/notes", notesRouter);
 
 const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
@@ -28,4 +45,10 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   return res.status(500).json({ success: false, error: "Something went wrong on the server." });
 };
 app.use(errorHandler);
-app.listen(Port, () => console.log(`LectureNotes AI backend listening on ${Port}`));
+
+// In local/standalone environment, listen on the configured port. On Vercel, the app is exported as a serverless handler.
+if (!process.env.VERCEL) {
+  app.listen(Port, () => console.log(`LectureNotes AI backend listening on port ${Port}`));
+}
+
+export default app;

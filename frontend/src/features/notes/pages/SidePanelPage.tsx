@@ -9,6 +9,7 @@ import { QUICK_ACTIONS } from '../../../constants';
 import { Note, NoteSettings } from '../types/notes.types';
 import { notesApi } from '../api/notes.api';
 import { parseMarkdownToHtml } from '../../../lib/markdown';
+import { env } from '../../../config/env';
 
 export const SidePanelPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -45,6 +46,8 @@ export const SidePanelPage: React.FC = () => {
   };
 
   const handleOpenFullTab = (streamInTab = false) => {
+    const studioBase = env.webStudioUrl.replace(/\/+$/, '');
+
     if (streamInTab) {
       const newNoteId = `note-${Date.now()}`;
       const pendingDraft = {
@@ -60,15 +63,21 @@ export const SidePanelPage: React.FC = () => {
           detailedMath,
         },
       };
-      sessionStorage.setItem(`pending_note_gen_${newNoteId}`, JSON.stringify(pendingDraft));
-      const targetUrl = chrome.runtime ? chrome.runtime.getURL(`index.html#/notes/${newNoteId}?streaming=1`) : `#/notes/${newNoteId}?streaming=1`;
-      window.open(targetUrl, '_blank', 'noopener');
+      try {
+        sessionStorage.setItem(`pending_note_gen_${newNoteId}`, JSON.stringify(pendingDraft));
+      } catch (e) {}
+
+      const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(customTopic || videoTitle)}&auto=1`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } else if (activeNote) {
-      const targetUrl = chrome.runtime ? chrome.runtime.getURL(`index.html#/notes/${activeNote.id}`) : `#/notes/${activeNote.id}`;
-      window.open(targetUrl, '_blank', 'noopener');
+      const targetUrl = `${studioBase}/#/notes/${activeNote.id}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    } else if (videoId) {
+      const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(videoTitle)}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } else {
-      const targetUrl = chrome.runtime ? chrome.runtime.getURL(`index.html#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(videoTitle)}`) : `#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(videoTitle)}`;
-      window.open(targetUrl, '_blank', 'noopener');
+      const targetUrl = `${studioBase}/#/`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
