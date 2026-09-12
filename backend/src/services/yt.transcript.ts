@@ -98,47 +98,38 @@ export async function fetchOEmbedMetadata(
 }
 
 async function fetchAnyTranscript(api: YouTubeTranscriptApi, videoId: string): Promise<TranscriptEntry[]> {
+  const list = await api.list(videoId);
+
+  // 1. Try finding English transcript
   try {
-    const list = await api.list(videoId);
-
-    // 1. Try finding English transcript
-    try {
-      const en = list.findTranscript(["en", "en-US", "en-GB"]);
-      return toEntries(await en.fetch());
-    } catch {
-      // ignore
-    }
-
-    // 2. Try any available transcript (e.g. 'hi' Hindi auto-generated)
-    for (const item of list) {
-      try {
-        // If translatable to English, translate it; otherwise fetch original language
-        if (item.isTranslatable) {
-          try {
-            return toEntries(await item.translate("en").fetch());
-          } catch {
-            // fall through to original
-          }
-        }
-        return toEntries(await item.fetch());
-      } catch {
-        continue;
-      }
-    }
+    const en = list.findTranscript(["en", "en-US", "en-GB"]);
+    return toEntries(await en.fetch());
   } catch {
-    // If list() fails or not available, try direct fetch
+    // ignore and try other tracks
+  }
+
+  // 2. Try any available transcript
+  for (const item of list) {
     try {
-      return toEntries(await api.fetch(videoId));
+      if (item.isTranslatable) {
+        try {
+          return toEntries(await item.translate("en").fetch());
+        } catch {
+          // fall through to raw
+        }
+      }
+      return toEntries(await item.fetch());
     } catch {
-      // ignore
+      continue;
     }
   }
-  return [];
+
+  throw new Error("No caption tracks could be parsed for this video.");
 }
 
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
   const pool = getProxies();
-  const maxAttempts = pool.length > 0 ? Math.min(pool.length, 5) : 1;
+  const maxAttempts = pool.length > 0 ? pool.length : 1;
   let transcript: TranscriptEntry[] = [];
   let lastError: any = null;
 
