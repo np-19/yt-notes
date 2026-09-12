@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { z } from "zod";
-import { getVideoDetailsAndTranscript, getTranscript } from "../services/yt.transcript.js";
+import { getVideoDetailsAndTranscript } from "../services/yt.transcript.js";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
+import { ExpressError } from "../utils/expressError.js";
 
 const router = Router();
 const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Invalid YouTube video ID");
@@ -42,6 +43,14 @@ router.post("/", async (req, res, next) => {
       if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
         resolvedTitle = videoInfo.title || resolvedTitle || `Lecture Notes — ${body.videoId}`;
       }
+    }
+
+    // Strictly require video transcript to synthesize notes
+    if (!transcript || transcript.length === 0) {
+      throw new ExpressError(
+        "A transcript is not available for this video. Please ensure the video has closed captions (CC) or subtitles enabled on YouTube.",
+        422
+      );
     }
 
     const markdown = await generateNotes(body.videoId, transcript, {
@@ -90,6 +99,19 @@ router.post("/stream", async (req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
+
+    // Strictly require video transcript to synthesize notes
+    if (!transcript || transcript.length === 0) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          message:
+            "A transcript is not available for this video. Please ensure the video has closed captions (CC) or subtitles enabled on YouTube.",
+        })}\n\n`
+      );
+      res.end();
+      return;
+    }
 
     const fullMarkdown = await generateNotesStream(
       body.videoId,
