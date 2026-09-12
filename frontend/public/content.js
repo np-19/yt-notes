@@ -12,6 +12,180 @@
     }
   };
 
+  const decodeEntities = (text) => {
+    return text
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+      .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
+  };
+
+  const parseTranscriptXml = (xml, lang = "en") => {
+    try {
+      const results = [];
+      // 1. Try srv3 format (<p t="ms" d="ms"><s>word</s>...</p>)
+      const pRegex = /<p\s+t="(\d+)"\s+d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g;
+      let match;
+      while ((match = pRegex.exec(xml)) !== null) {
+        const startMs = parseInt(match[1], 10);
+        const durMs = parseInt(match[2], 10);
+        const inner = match[3];
+        let text = "";
+        const sRegex = /<s[^>]*>([^<]*)<\/s>/g;
+        let sMatch;
+        while ((sMatch = sRegex.exec(inner)) !== null) {
+          text += sMatch[1];
+        }
+        if (!text) {
+          text = inner.replace(/<[^>]+>/g, "");
+        }
+        text = decodeEntities(text).trim();
+        if (text) {
+          results.push({
+            text,
+            duration: durMs,
+            offset: startMs,
+            lang,
+          });
+        }
+      }
+      if (results.length > 0) return results;
+
+      // 2. Fall back to classic format (<text start="s" dur="s">content</text>)
+      const RE_XML_TRANSCRIPT = /<text\s+start="([^"]*)"\s+dur="([^"]*)"[^>]*>([^<]*)<\/text>/g;
+      const classicResults = [...xml.matchAll(RE_XML_TRANSCRIPT)];
+      return classicResults
+        .map((res) => ({
+          text: decodeEntities(res[3]).trim(),
+          duration: Math.round(parseFloat(res[2]) * 1000),
+          offset: Math.round(parseFloat(res[1]) * 1000),
+          lang,
+        }))
+        .filter((e) => Boolean(e.text));
+    } catch (err) {
+      console.warn("Failed to parse transcript XML:", err);
+      return [];
+    }
+  };
+
+  const fetchClientTranscript = async (videoId) => {
+    try {
+      // Strategy 1: YouTube InnerTube API (Android client)
+      try {
+        const resp = await fetch("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "User-Agent": "com.google.android.youtube/20.10.38 (Linux; U; Android 14)",
+          },
+          body: JSON.stringify({
+            context: {
+              client: {
+                clientName: "ANDROID",
+                clientVersion: "20.10.38",
+              },
+            },
+            videoId,
+          }),
+        });
+
+        if (resp.ok) {
+          const data = await resp.json();
+          const captionTracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+          if (Array.isArray(captionTracks) && captionTracks.length > 0) {
+            const chosen =
+              captionTracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
+              captionTracks[0];
+            if (chosen && chosen.baseUrl) {
+              const xmlRes = await fetch(chosen.baseUrl);
+              const xml = await xmlRes.text();
+              const parsed = parseTranscriptXml(xml, chosen.languageCode || "en");
+              if (parsed.length > 0) {
+                if (chrome.storage?.local) {
+                  chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
+                }
+                return parsed;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("InnerTube transcript fetch error:", err);
+      }
+
+      // Strategy 2: Request from Page Bridge
+      try {
+        const tracks = await getTracksFromPageBridge(videoId);
+        if (Array.isArray(tracks) && tracks.length > 0) {
+          const chosen =
+            tracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
+            tracks[0];
+          if (chosen && chosen.baseUrl) {
+            const timedTextRes = await fetch(chosen.baseUrl);
+            const xml = await timedTextRes.text();
+            const parsed = parseTranscriptXml(xml, chosen.languageCode || "en");
+            if (parsed.length > 0) {
+              if (chrome.storage?.local) {
+                chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
+              }
+              return parsed;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Page bridge transcript fetch error:", err);
+      }
+
+      // Strategy 3: Direct Web Page fallback
+      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: "omit" });
+      const html = await pageRes.text();
+      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+      if (captionMatch) {
+        const fallbackTracks = JSON.parse(captionMatch[1]);
+        if (Array.isArray(fallbackTracks) && fallbackTracks.length > 0) {
+          const chosen =
+            fallbackTracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
+            fallbackTracks[0];
+          if (chosen && chosen.baseUrl) {
+            const timedTextRes = await fetch(chosen.baseUrl);
+            const xml = await timedTextRes.text();
+            const parsed = parseTranscriptXml(xml, chosen.languageCode || "en");
+            if (parsed.length > 0) {
+              if (chrome.storage?.local) {
+                chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
+              }
+              return parsed;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Client transcript extraction error:", e);
+    }
+    return null;
+  };
+
+  const getTracksFromPageBridge = (videoId) => {
+    return new Promise((resolve) => {
+      const handler = (e) => {
+        if (e.data?.type === "YT_CAPTIONS_TRACK_RESPONSE" && e.data.videoId === videoId) {
+          window.removeEventListener("message", handler);
+          resolve(e.data.tracks || []);
+        }
+      };
+      window.addEventListener("message", handler);
+      window.postMessage({ type: "GET_YT_CAPTIONS_TRACK", videoId }, "*");
+      setTimeout(() => {
+        window.removeEventListener("message", handler);
+        resolve([]);
+      }, 1500);
+    });
+  };
+
   const createSidePanel = () => {
     if (!isExtensionValid()) return;
     if (document.getElementById("lecture-notes-panel-container")) return;
@@ -94,7 +268,7 @@
         floatBtn.textContent = "📖 Notes Open";
       }
 
-      // Pre-extract transcript
+      // Pre-extract transcript immediately
       fetchClientTranscript(videoId);
     } catch (e) {
       console.warn("Failed to open side panel:", e);
@@ -112,103 +286,6 @@
       floatBtn.style.opacity = "1";
       floatBtn.textContent = "✨ Generate Notes";
     }
-  };
-
-  // Ask page-bridge (MAIN world) for internal player caption tracks
-  const getTracksFromPageBridge = (videoId) => {
-    return new Promise((resolve) => {
-      const handler = (e) => {
-        if (e.data?.type === "YT_CAPTIONS_TRACK_RESPONSE" && e.data.videoId === videoId) {
-          window.removeEventListener("message", handler);
-          resolve(e.data.tracks || []);
-        }
-      };
-      window.addEventListener("message", handler);
-      window.postMessage({ type: "GET_YT_CAPTIONS_TRACK", videoId }, "*");
-      setTimeout(() => {
-        window.removeEventListener("message", handler);
-        resolve([]);
-      }, 1500);
-    });
-  };
-
-  const parseTimedTextXml = (xml, lang = "en") => {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xml, "text/xml");
-      const textElements = Array.from(doc.querySelectorAll("text"));
-
-      return textElements
-        .map((el) => {
-          const raw = el.textContent || "";
-          return {
-            text: raw
-              .replace(/&amp;/g, "&")
-              .replace(/&lt;/g, "<")
-              .replace(/&gt;/g, ">")
-              .replace(/&#39;/g, "'")
-              .replace(/&quot;/g, '"')
-              .replace(/\n/g, " ")
-              .trim(),
-            offset: Math.round(parseFloat(el.getAttribute("start") || "0") * 1000),
-            duration: Math.round(parseFloat(el.getAttribute("dur") || "0") * 1000),
-            lang,
-          };
-        })
-        .filter((entry) => Boolean(entry.text));
-    } catch (err) {
-      return [];
-    }
-  };
-
-  const fetchClientTranscript = async (videoId) => {
-    try {
-      // 1. Try getting caption tracks via page bridge (playerResponse / movie_player)
-      const tracks = await getTracksFromPageBridge(videoId);
-      if (Array.isArray(tracks) && tracks.length > 0) {
-        const chosen =
-          tracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
-          tracks[0];
-        if (chosen && chosen.baseUrl) {
-          const timedTextRes = await fetch(chosen.baseUrl);
-          const xml = await timedTextRes.text();
-          const parsed = parseTimedTextXml(xml, chosen.languageCode || "en");
-          if (parsed.length > 0) {
-            if (chrome.storage?.local) {
-              chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
-            }
-            return parsed;
-          }
-        }
-      }
-
-      // 2. Fallback: fetch YouTube page directly in browser context
-      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: "omit" });
-      const html = await pageRes.text();
-      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
-      if (captionMatch) {
-        const fallbackTracks = JSON.parse(captionMatch[1]);
-        if (Array.isArray(fallbackTracks) && fallbackTracks.length > 0) {
-          const chosen =
-            fallbackTracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
-            fallbackTracks[0];
-          if (chosen && chosen.baseUrl) {
-            const timedTextRes = await fetch(chosen.baseUrl);
-            const xml = await timedTextRes.text();
-            const parsed = parseTimedTextXml(xml, chosen.languageCode || "en");
-            if (parsed.length > 0) {
-              if (chrome.storage?.local) {
-                chrome.storage.local.set({ [`transcript_${videoId}`]: parsed });
-              }
-              return parsed;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("Client transcript extraction error:", e);
-    }
-    return null;
   };
 
   const initExtension = () => {
@@ -234,7 +311,7 @@
       }
     } catch (e) {}
 
-    // Extract caption track directly in browser where YouTube does not block residential IP
+    // Extract caption track directly in browser
     fetchClientTranscript(id);
 
     createSidePanel();
