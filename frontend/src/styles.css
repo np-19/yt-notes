@@ -810,18 +810,21 @@ button:disabled {
   border: 1px solid var(--note-pill-border, #e1bee7);
 }
 
-/* Flow Diagrams - 100% Transparent background, no tan box */
-.note-content .flow-diagram {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 20px 0;
-  padding: 10px 0;
+/* Flow Diagrams - 100% Transparent background, no tan box, centered */
+.note-content .flow-diagram,
+.flow-diagram {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  margin: 20px auto !important;
+  padding: 10px 0 !important;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  width: 100% !important;
+  text-align: center !important;
 }
 .note-content .flow-node {
   padding: 8px 14px;
@@ -848,22 +851,29 @@ button:disabled {
 }
 
 /* Mermaid Diagrams - Transparent background, perfectly centered */
-.note-content .mermaid {
+.note-content .mermaid,
+.mermaid,
+div.mermaid {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  padding: 16px 0;
+  padding: 16px 0 !important;
   margin: 24px auto !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
+  text-align: center !important;
   width: 100% !important;
-  overflow-x: auto;
+  overflow-x: auto !important;
 }
-.note-content .mermaid svg {
+.note-content .mermaid svg,
+.mermaid svg,
+div.mermaid svg,
+.note-content svg {
   max-width: 100% !important;
   height: auto !important;
-  margin: 0 auto !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
   display: block !important;
   background: transparent !important;
 }

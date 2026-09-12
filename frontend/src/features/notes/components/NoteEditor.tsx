@@ -132,7 +132,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
       // 4. Render Mermaid Flowcharts safely with dynamic theme palette support
       try {
-        const mermaidNodes = containerRef.current.querySelectorAll('.mermaid');
+        const mermaidNodes = containerRef.current.querySelectorAll('.mermaid, pre code.language-mermaid, pre.language-mermaid');
         if (mermaidNodes.length > 0) {
           mermaid.initialize({
             startOnLoad: false,
@@ -170,6 +170,19 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               const rawText = node.textContent?.trim() || '';
               if (!rawText) return;
 
+              let targetContainer = node as HTMLElement;
+              if (node.tagName === 'CODE' && node.parentElement?.tagName === 'PRE') {
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                node.parentElement.replaceWith(div);
+                targetContainer = div;
+              } else if (node.tagName === 'PRE') {
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                node.replaceWith(div);
+                targetContainer = div;
+              }
+
               let cleanDiagram = rawText.replace(/^```mermaid\s*/i, '').replace(/```$/i, '').trim();
               if (
                 !cleanDiagram.startsWith('graph') &&
@@ -188,8 +201,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
               const id = `mermaid-svg-${Date.now()}-${index}`;
               const { svg } = await mermaid.render(id, cleanDiagram);
-              node.innerHTML = svg;
-              node.setAttribute('data-processed', 'true');
+              targetContainer.innerHTML = svg;
+              targetContainer.setAttribute('data-processed', 'true');
             } catch (diagramErr) {
               console.warn('Skipping unparseable Mermaid diagram:', diagramErr);
               node.setAttribute('data-processed', 'true');

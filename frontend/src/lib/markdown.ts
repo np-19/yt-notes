@@ -21,15 +21,20 @@ export function isHtmlContent(content: string): boolean {
 export function parseMarkdownToHtml(content: string): string {
   if (!content) return "";
 
-  // If already legacy full HTML, sanitize and return
+  // If already legacy full HTML, sanitize, transform mermaid if present, and return
   if (isHtmlContent(content)) {
-    return DOMPurify.sanitize(content, {
+    let processedHtml = content;
+    processedHtml = processedHtml.replace(
+      /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/gi,
+      '<div class="mermaid">$1</div>'
+    );
+    return DOMPurify.sanitize(processedHtml, {
       ADD_TAGS: [
         "article", "section", "header", "main", "table", "thead", "tbody", "tr", "th", "td",
         "div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong",
-        "b", "em", "i", "blockquote", "code", "pre", "a", "br", "hr"
+        "b", "em", "i", "blockquote", "code", "pre", "a", "br", "hr", "svg", "g", "path", "rect", "circle", "text", "line"
       ],
-      ADD_ATTR: ["class", "id", "target", "rel", "href"],
+      ADD_ATTR: ["class", "id", "target", "rel", "href", "style", "viewBox", "width", "height", "d", "fill", "stroke", "stroke-width"],
     });
   }
 
