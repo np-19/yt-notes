@@ -1,5 +1,9 @@
 import "../configs/constants.js";
-import { YouTubeTranscriptApi, GenericProxyConfig } from "@hallelx/youtube-transcript";
+import {
+  YouTubeTranscriptApi,
+  GenericProxyConfig,
+  WebshareProxyConfig,
+} from "@hallelx/youtube-transcript";
 
 export type TranscriptEntry = {
   text: string;
@@ -16,8 +20,10 @@ export type VideoInfo = {
   hasSubtitles: boolean;
 };
 
-// ── Proxy pool ─────────────────────────────────────────────────────────────
-// Parses "ip:port:user:pass" or any http(s):// / socks5:// URL
+// ── Proxy configuration ───────────────────────────────────────────────────
+// Supports:
+// 1. Webshare rotating residential proxy (WEBSHARE_PROXY_USERNAME & WEBSHARE_PROXY_PASSWORD)
+// 2. Generic proxy list / static IPs (YOUTUBE_PROXY_URL / YOUTUBE_PROXIES)
 
 function parseProxyUrl(entry: string): string | null {
   const s = entry.trim();
@@ -44,25 +50,34 @@ function loadProxies(): string[] {
     .filter((u): u is string => u !== null && u.length > 0);
 }
 
-function getProxies(): string[] {
-  return loadProxies();
-}
-
 let proxyIndex = 0;
 
-function getNextProxyConfig(): GenericProxyConfig | undefined {
-  const proxies = getProxies();
+function getProxyConfig(): GenericProxyConfig | WebshareProxyConfig | undefined {
+  const webshareUser = process.env.WEBSHARE_PROXY_USERNAME;
+  const websharePass = process.env.WEBSHARE_PROXY_PASSWORD;
+
+  if (webshareUser && websharePass) {
+    return new WebshareProxyConfig({
+      proxyUsername: webshareUser,
+      proxyPassword: websharePass,
+      retriesWhenBlocked: 10,
+    });
+  }
+
+  const proxies = loadProxies();
   if (proxies.length === 0) return undefined;
+
   const url = proxies[proxyIndex % proxies.length];
   if (!url) return undefined;
   proxyIndex = (proxyIndex + 1) % proxies.length;
+
   return new GenericProxyConfig({ httpUrl: url, httpsUrl: url });
 }
 
-function buildApi(proxyConfig?: GenericProxyConfig): YouTubeTranscriptApi {
-  const proxy = proxyConfig ?? getNextProxyConfig();
-  return proxy
-    ? new YouTubeTranscriptApi({ proxyConfig: proxy })
+function buildApi(): YouTubeTranscriptApi {
+  const proxyConfig = getProxyConfig();
+  return proxyConfig
+    ? new YouTubeTranscriptApi({ proxyConfig })
     : new YouTubeTranscriptApi();
 }
 
@@ -97,51 +112,19 @@ export async function fetchOEmbedMetadata(
   return { title: "", author: "" };
 }
 
-async function fetchTranscriptWithFallbacks(videoId: string, api: YouTubeTranscriptApi): Promise<TranscriptEntry[]> {
-  try {
-    const list = await api.list(videoId);
-    // 1. Try finding manually created or generated transcripts for 'en'
-    try {
-      const enTranscript = list.findTranscript(["en", "en-US", "en-GB"]);
-      return toEntries(await enTranscript.fetch());
-    } catch {
-      // 2. Fall back to any available first transcript in the list
-      const iter = list[Symbol.iterator]();
-      const first = iter.next().value;
-      if (first) {
-        return toEntries(await first.fetch());
-      }
-    }
-  } catch (err: any) {
-    // If list() fails or fetch() fails, try direct api.fetch
-    try {
-      return toEntries(await api.fetch(videoId, { languages: ["en"] }));
-    } catch {
-      return toEntries(await api.fetch(videoId));
-    }
-  }
-  return [];
-}
-
 export async function getVideoDetailsAndTranscript(videoId: string): Promise<VideoInfo> {
-  const pool = getProxies();
-  const maxAttempts = pool.length > 0 ? pool.length : 1;
+  // Each call picks the next proxy in the pool (round-robin)
+  const api = buildApi();
   let transcript: TranscriptEntry[] = [];
-  let lastError: any = null;
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const api = buildApi();
+  try {
+    transcript = toEntries(await api.fetch(videoId, { languages: ["en"] }));
+  } catch {
     try {
-      transcript = await fetchTranscriptWithFallbacks(videoId, api);
-      if (transcript.length > 0) break;
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`[yt.transcript] Attempt ${attempt + 1}/${maxAttempts} failed for video ${videoId}:`, err?.message || err);
+      transcript = toEntries(await api.fetch(videoId));
+    } catch {
+      // No transcript available
     }
-  }
-
-  if (transcript.length === 0 && lastError) {
-    console.error(`[yt.transcript] All proxy attempts failed for video ${videoId}. Last error:`, lastError?.message || lastError);
   }
 
   const { title, author } = await fetchOEmbedMetadata(videoId);
