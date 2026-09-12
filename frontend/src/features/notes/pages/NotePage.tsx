@@ -103,7 +103,31 @@ export const NotePage: React.FC = () => {
         return;
       }
 
-      // 1. Check if there's a pending stream generation for this note ID
+      // 1. Check if there is an imported note payload in the URL (from extension)
+      const importParam = searchParams.get('import');
+      if (importParam) {
+        try {
+          const raw = decodeURIComponent(atob(decodeURIComponent(importParam)));
+          const importedNote: Note = JSON.parse(raw);
+          if (importedNote && (importedNote.id || importedNote.htmlContent)) {
+            const finalNote: Note = {
+              ...importedNote,
+              id: id,
+            };
+            await notesApi.saveNote(finalNote);
+            if (isMounted) {
+              setActiveDocument(finalNote);
+              setIsLoadingDoc(false);
+              navigate(`/notes/${id}`, { replace: true });
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse transferred note from extension:', e);
+        }
+      }
+
+      // 2. Check if there's a pending stream generation for this note ID
       const pendingRaw = sessionStorage.getItem(`pending_note_gen_${id}`);
       if (pendingRaw && (isStreamingQuery || !streamStartedRef.current)) {
         try {
@@ -118,7 +142,7 @@ export const NotePage: React.FC = () => {
         }
       }
 
-      // 2. Otherwise load existing saved note from storage/backend
+      // 3. Otherwise load existing saved note from storage/backend
       setIsLoadingDoc(true);
       const found = await notesApi.fetchNoteById(id);
       if (isMounted) {

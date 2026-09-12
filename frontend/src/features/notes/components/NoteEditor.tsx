@@ -203,6 +203,68 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   }, [renderedHtml, activeTab, isEditing, activeThemeId]);
 
   const handlePrintPdf = () => {
+    const isInsideSidePanel = window.self !== window.top || window.location.hash.includes('sidepanel');
+    const noteEl = document.querySelector('.note-content');
+
+    if (isInsideSidePanel && noteEl) {
+      const printWindow = window.open('', '_blank', 'width=950,height=900');
+      if (printWindow) {
+        const styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+          .map((el) => el.outerHTML)
+          .join('\n');
+
+        printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${note.title || 'Lecture Study Notes'}</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  ${styles}
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm;
+    }
+    html, body {
+      background: #ffffff !important;
+      color: #1c1917 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      height: auto !important;
+    }
+    .note-content {
+      width: 100% !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      border: none !important;
+      padding: 0 !important;
+    }
+    .no-print {
+      display: none !important;
+    }
+  </style>
+</head>
+<body class="theme-${activeThemeId || 'amber'}">
+  <div class="note-content">
+    ${noteEl.innerHTML}
+  </div>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        window.print();
+        setTimeout(() => window.close(), 1000);
+      }, 400);
+    });
+  <\/script>
+</body>
+</html>`);
+        printWindow.document.close();
+        return;
+      }
+    }
+
     window.print();
   };
 

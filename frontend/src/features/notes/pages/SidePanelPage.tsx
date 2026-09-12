@@ -70,8 +70,14 @@ export const SidePanelPage: React.FC = () => {
       const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(customTopic || videoTitle)}&auto=1`;
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } else if (activeNote) {
-      const targetUrl = `${studioBase}/#/notes/${activeNote.id}`;
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      try {
+        const payload = encodeURIComponent(btoa(encodeURIComponent(JSON.stringify(activeNote))));
+        const targetUrl = `${studioBase}/#/notes/${activeNote.id}?import=${payload}`;
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        const targetUrl = `${studioBase}/#/notes/${activeNote.id}`;
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
     } else if (videoId) {
       const targetUrl = `${studioBase}/#/?v=${encodeURIComponent(videoId)}&title=${encodeURIComponent(videoTitle)}`;
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
