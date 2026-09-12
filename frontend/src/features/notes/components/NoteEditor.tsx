@@ -218,6 +218,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 svgEl.style.marginLeft = 'auto';
                 svgEl.style.marginRight = 'auto';
                 svgEl.style.maxWidth = '100%';
+                svgEl.style.maxHeight = '420px';
+                svgEl.style.width = 'auto';
               }
             } catch (diagramErr) {
               console.warn('Skipping unparseable Mermaid diagram:', diagramErr);
@@ -236,6 +238,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           const svgEl = svg as SVGElement;
           svgEl.style.setProperty('margin', '0 auto', 'important');
           svgEl.style.setProperty('display', 'block', 'important');
+          svgEl.style.setProperty('max-width', '100%', 'important');
+          svgEl.style.setProperty('max-height', '420px', 'important');
+          svgEl.style.setProperty('width', 'auto', 'important');
           if (svgEl.parentElement) {
             svgEl.parentElement.style.setProperty('text-align', 'center', 'important');
             svgEl.parentElement.style.setProperty('display', 'flex', 'important');

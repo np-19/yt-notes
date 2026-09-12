@@ -870,8 +870,9 @@ div.mermaid {
 .mermaid svg,
 div.mermaid svg,
 .note-content svg {
+  width: auto !important;
   max-width: 100% !important;
-  height: auto !important;
+  max-height: 420px !important;
   margin-left: auto !important;
   margin-right: auto !important;
   display: block !important;
