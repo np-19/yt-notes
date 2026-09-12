@@ -5,20 +5,19 @@ import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "./yt.transcript.js";
 
 const FAST_LOW_COST_MODELS = [
-  GeminiModel || "gemini-2.5-flash",
-  "gemini-2.5-flash",
-  "gemini-1.5-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-pro",
+  GeminiModel || "gemini-3.6-flash",
+  "gemini-3.6-flash",
+  "gemini-flash-latest",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
 ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
 const SYNTHESIS_MODELS = [
-  GeminiModel || "gemini-2.5-flash",
-  "gemini-2.5-flash",
-  "gemini-1.5-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-pro",
-  "gemini-2.5-pro",
+  GeminiModel || "gemini-3.6-flash",
+  "gemini-3.6-flash",
+  "gemini-flash-latest",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
 ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
 function getGenAI() {
