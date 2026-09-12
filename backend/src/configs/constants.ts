@@ -8,4 +8,4 @@ export const AllowedFrontendOrigins = (process.env.FRONTEND_URL || "http://local
   .map((u) => u.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 export const GeminiApiKey = process.env.GEMINI_API_KEY ?? "";
-export const GeminiModel = process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
+export const GeminiModel = process.env.GEMINI_MODEL ?? "gemini-2.5-flash";
