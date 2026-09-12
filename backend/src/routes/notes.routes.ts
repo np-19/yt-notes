@@ -3,7 +3,6 @@ import { z } from "zod";
 import { getVideoDetailsAndTranscript } from "../services/yt.transcript.js";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
-import { ExpressError } from "../utils/expressError.js";
 
 const router = Router();
 const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Invalid YouTube video ID");
