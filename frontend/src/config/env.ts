@@ -16,8 +16,17 @@ const getWebStudioUrl = (): string => {
   return "http://localhost:5173";
 };
 
+const sanitizeBackendUrl = (url?: string): string => {
+  let u = (url || "http://localhost:5000").trim().replace(/\/+$/, "");
+  // Fix accidental https:// on localhost
+  if (u.startsWith("https://localhost") || u.startsWith("https://127.0.0.1")) {
+    u = u.replace(/^https:/, "http:");
+  }
+  return u;
+};
+
 export const env = {
-  backendUrl: (import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/+$/, ""),
+  backendUrl: sanitizeBackendUrl(import.meta.env.VITE_BACKEND_URL),
   webStudioUrl: getWebStudioUrl(),
   isDev: import.meta.env.DEV,
   appTitle: "LectureNotes AI",
