@@ -53,6 +53,7 @@ const HomePage: React.FC = () => {
     };
 
     sessionStorage.setItem(`pending_note_gen_${newNoteId}`, JSON.stringify(pendingDraft));
+    localStorage.setItem(`pending_note_gen_${newNoteId}`, JSON.stringify(pendingDraft));
     navigate(`/notes/${newNoteId}?streaming=1`);
   };
 

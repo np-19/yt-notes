@@ -127,19 +127,24 @@ export const NotePage: React.FC = () => {
         }
       }
 
-      // 2. Check if there's a pending stream generation for this note ID
-      const pendingRaw = sessionStorage.getItem(`pending_note_gen_${id}`);
+      // 2. Check if there's a pending stream generation for this note ID (session or local storage)
+      const pendingRaw = sessionStorage.getItem(`pending_note_gen_${id}`) || localStorage.getItem(`pending_note_gen_${id}`);
       if (pendingRaw) {
         try {
           const draftData = JSON.parse(pendingRaw);
           if (!streamStartedRef.current) {
             streamStartedRef.current = true;
             await startStreamingSynthesis(id, draftData);
-            return;
           }
+          return;
         } catch (e) {
           console.warn('Failed to parse pending draft data:', e);
         }
+      }
+
+      // If stream has already been started, do not overwrite with null
+      if (streamStartedRef.current) {
+        return;
       }
 
       // 3. Otherwise load existing saved note from storage/backend
