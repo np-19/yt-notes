@@ -1,5 +1,9 @@
 import "../configs/constants.js";
-import { YouTubeTranscriptApi, GenericProxyConfig } from "@hallelx/youtube-transcript";
+import {
+  YouTubeTranscriptApi,
+  GenericProxyConfig,
+  WebshareProxyConfig,
+} from "@hallelx/youtube-transcript";
 
 export type TranscriptEntry = {
   text: string;
@@ -17,7 +21,9 @@ export type VideoInfo = {
 };
 
 // ── Proxy pool ─────────────────────────────────────────────────────────────
-// Parses "ip:port:user:pass" or any http(s):// / socks5:// URL
+// Supports:
+// 1. Webshare rotating residential proxy: WEBSHARE_PROXY_USERNAME & WEBSHARE_PROXY_PASSWORD
+// 2. Generic proxy list: YOUTUBE_PROXY_URL / YOUTUBE_PROXIES (comma/newline separated)
 
 function parseProxyUrl(entry: string): string | null {
   const s = entry.trim();
@@ -50,17 +56,29 @@ function getProxies(): string[] {
 
 let proxyIndex = 0;
 
-function getNextProxyConfig(): GenericProxyConfig | undefined {
+function getProxyConfig(): GenericProxyConfig | WebshareProxyConfig | undefined {
+  const webshareUser = process.env.WEBSHARE_PROXY_USERNAME;
+  const websharePass = process.env.WEBSHARE_PROXY_PASSWORD;
+
+  if (webshareUser && websharePass) {
+    return new WebshareProxyConfig({
+      proxyUsername: webshareUser,
+      proxyPassword: websharePass,
+      retriesWhenBlocked: 10,
+    });
+  }
+
   const proxies = getProxies();
   if (proxies.length === 0) return undefined;
+
   const url = proxies[proxyIndex % proxies.length];
   if (!url) return undefined;
   proxyIndex = (proxyIndex + 1) % proxies.length;
   return new GenericProxyConfig({ httpUrl: url, httpsUrl: url });
 }
 
-function buildApi(proxyConfig?: GenericProxyConfig): YouTubeTranscriptApi {
-  const proxy = proxyConfig ?? getNextProxyConfig();
+function buildApi(): YouTubeTranscriptApi {
+  const proxy = getProxyConfig();
   return proxy
     ? new YouTubeTranscriptApi({ proxyConfig: proxy })
     : new YouTubeTranscriptApi();
