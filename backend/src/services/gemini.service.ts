@@ -9,7 +9,21 @@ function getModel() {
   return new GoogleGenerativeAI(GeminiApiKey).getGenerativeModel({ model: GeminiModel });
 }
 
-function buildNotesPrompt(videoId: string, transcript: TranscriptEntry[], settings: NoteSettings): string {
+function buildNotesPrompt(
+  videoId: string,
+  transcript: TranscriptEntry[],
+  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
+): string {
+  const lectureTitle = settings.videoTitle?.trim() || `Technical Lecture (${videoId})`;
+  const transcriptSection =
+    transcript && transcript.length > 0
+      ? `Timestamped Transcript:\n${transcript.map((entry) => `[${entry.offset}ms] ${entry.text}`).join("\n")}`
+      : `Lecture Topic / Subject: "${lectureTitle}" (YouTube Video ID: ${videoId}).\nNote: Synthesize the definitive, high-depth technical study guide covering this topic in full academic rigor with foundational principles, architectures, algorithms, equations, diagrams, and concrete implementation examples.`;
+
+  const customInstruction = settings.customPrompt?.trim()
+    ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`
+    : "";
+
   return `Create a complete, highly structured educational study guide in clean GitHub-Flavored Markdown (GFM) for a technical lecture, adhering to the design language of a published technical whitepaper.
 
 CRITICAL FORMATTING & CONTENT RULES:
@@ -17,8 +31,8 @@ CRITICAL FORMATTING & CONTENT RULES:
 - NO EMOJIS: Never use emojis anywhere. Use minimalistic typographic symbols only: ✓ for yes/positive, ✗ for no/negative, and → for flow arrows.
 - STANDALONE A4 FRONT COVER PAGE: Always begin the document with the exact full A4 cover page header format below:
   <header class="note-cover">
-    <h1>[Accurate Technical Lecture Title — If a specific title is not provided, synthesize a descriptive, professional academic title based directly on the lecture concepts]</h1>
-    <p class="subtitle">[Complete Technical Study Guide & Architecture Whitepaper]</p>
+    <h1>${lectureTitle}</h1>
+    <p class="subtitle">Complete Technical Study Guide & Architecture Whitepaper</p>
     <p class="description">[Executive Summary: 2-3 dense, rigorous sentences summarizing the foundational architectural invariants, core problem domains, data structures, algorithms, and key tradeoffs addressed in this lecture.]</p>
     <div class="badge-pill">Academic Synthesis  •  A4 Technical Whitepaper</div>
   </header>
@@ -67,13 +81,16 @@ CRITICAL FORMATTING & CONTENT RULES:
 - SUMMARY CHEAT-SHEET: Conclude with a numbered section containing a "Summary Cheat-Sheet" table and a "Big-Picture Architecture" model.
 
 Lecture Configuration:
-Detail: ${settings.detailLevel}; diagrams: ${settings.diagramDensity}; examples: ${settings.examples}; code: ${settings.includeCode}; math: ${settings.detailedMath}.
-Video ID: ${videoId}.
-Timestamped transcript:
-${transcript.map((entry) => `[${entry.offset}ms] ${entry.text}`).join("\n")}`;
+Detail Level: ${settings.detailLevel}; Diagrams: ${settings.diagramDensity}; Examples: ${settings.examples}; Include Code: ${settings.includeCode}; Math Formulas: ${settings.detailedMath}.
+${customInstruction}
+${transcriptSection}`;
 }
 
-export async function generateNotes(videoId: string, transcript: TranscriptEntry[], settings: NoteSettings): Promise<string> {
+export async function generateNotes(
+  videoId: string,
+  transcript: TranscriptEntry[],
+  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
+): Promise<string> {
   const prompt = buildNotesPrompt(videoId, transcript, settings);
   try {
     const result = await getModel().generateContent(prompt);
@@ -86,7 +103,7 @@ export async function generateNotes(videoId: string, transcript: TranscriptEntry
 export async function generateNotesStream(
   videoId: string,
   transcript: TranscriptEntry[],
-  settings: NoteSettings,
+  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined },
   onChunk: (chunkText: string) => void
 ): Promise<string> {
   const prompt = buildNotesPrompt(videoId, transcript, settings);

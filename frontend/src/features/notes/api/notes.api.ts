@@ -81,6 +81,8 @@ export const notesApi = {
     const payload = {
       videoId,
       videoTitle: titleCandidate,
+      customPrompt: params.customPrompt || undefined,
+      transcript: params.transcript && params.transcript.length > 0 ? params.transcript : undefined,
       detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
       diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
       examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
@@ -145,6 +147,8 @@ export const notesApi = {
     const payload = {
       videoId,
       videoTitle: titleCandidate,
+      customPrompt: params.customPrompt || undefined,
+      transcript: params.transcript && params.transcript.length > 0 ? params.transcript : undefined,
       detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
       diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
       examples: examplesMap[params.settings?.examples || 'many'] || 'normal',

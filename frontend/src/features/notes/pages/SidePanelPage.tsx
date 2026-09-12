@@ -98,12 +98,24 @@ export const SidePanelPage: React.FC = () => {
 
     const topicTitle = title || customTopic || (vId ? `Lecture Notes — ${vId}` : 'Synthesized Notes');
 
+    let localTranscript: Array<{ text: string; offset?: number; duration?: number; lang?: string }> | undefined = undefined;
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      try {
+        const stored: { [key: string]: any } = await chrome.storage.local.get([`transcript_${vId}`]);
+        const candidate = stored[`transcript_${vId}`];
+        if (Array.isArray(candidate) && candidate.length > 0) {
+          localTranscript = candidate;
+        }
+      } catch (e) {}
+    }
+
     await notesApi.streamGenerateNotes(
       {
         youtubeUrl: `https://www.youtube.com/watch?v=${vId}`,
         customTopic: topicTitle,
         customPrompt: customPrompt || undefined,
         settings,
+        transcript: localTranscript,
       },
       (_chunk, cumulative) => {
         setStreamedMarkdown(cumulative);

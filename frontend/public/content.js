@@ -98,6 +98,59 @@
     }
   };
 
+  const fetchClientTranscript = async (videoId) => {
+    try {
+      const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, { credentials: "omit" });
+      const html = await pageRes.text();
+      const captionMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+      if (!captionMatch) return null;
+
+      const tracks = JSON.parse(captionMatch[1]);
+      if (!Array.isArray(tracks) || tracks.length === 0) return null;
+
+      const chosen =
+        tracks.find((t) => t.languageCode === "en" || t.vssId?.includes("en")) ||
+        tracks[0];
+
+      if (!chosen || !chosen.baseUrl) return null;
+
+      const timedTextRes = await fetch(chosen.baseUrl);
+      const xml = await timedTextRes.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, "text/xml");
+      const textElements = Array.from(doc.querySelectorAll("text"));
+
+      const transcript = textElements
+        .map((el) => {
+          const raw = el.textContent || "";
+          return {
+            text: raw
+              .replace(/&amp;/g, "&")
+              .replace(/&lt;/g, "<")
+              .replace(/&gt;/g, ">")
+              .replace(/&#39;/g, "'")
+              .replace(/&quot;/g, '"')
+              .replace(/\n/g, " ")
+              .trim(),
+            offset: Math.round(parseFloat(el.getAttribute("start") || "0") * 1000),
+            duration: Math.round(parseFloat(el.getAttribute("dur") || "0") * 1000),
+            lang: chosen.languageCode || "en",
+          };
+        })
+        .filter((entry) => Boolean(entry.text));
+
+      if (transcript.length > 0) {
+        if (chrome.storage?.local) {
+          chrome.storage.local.set({ [`transcript_${videoId}`]: transcript });
+        }
+        return transcript;
+      }
+    } catch (e) {
+      console.warn("Client transcript extraction error:", e);
+    }
+    return null;
+  };
+
   const initExtension = () => {
     if (!isExtensionValid()) {
       if (pollInterval) clearInterval(pollInterval);
@@ -120,6 +173,9 @@
         chrome.storage.local.set({ currentVideo });
       }
     } catch (e) {}
+
+    // Extract caption track directly in browser where YouTube does not block residential IP
+    fetchClientTranscript(id);
 
     createSidePanel();
 

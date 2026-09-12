@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getTranscript } from "../services/yt.transcript.js";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
+import { ExpressError } from "../utils/expressError.js";
 
 const router = Router();
 const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Invalid YouTube video ID");
@@ -14,11 +15,34 @@ const settings = z.object({
   detailedMath: z.boolean().default(false),
 });
 
+const transcriptEntrySchema = z.object({
+  text: z.string(),
+  duration: z.number().optional().default(0),
+  offset: z.number().optional().default(0),
+  lang: z.string().optional().default("en"),
+});
+
+const notePayloadSchema = settings.extend({
+  videoId,
+  videoTitle: z.string().trim().min(1).max(300).optional(),
+  customPrompt: z.string().max(2000).optional(),
+  transcript: z.array(transcriptEntrySchema).optional(),
+});
+
 router.post("/", async (req, res, next) => {
   try {
-    const body = settings.extend({ videoId, videoTitle: z.string().trim().min(1).max(300).optional() }).parse(req.body);
-    const markdown = await generateNotes(body.videoId, await getTranscript(body.videoId), body);
-    const { videoId: _videoId, videoTitle, ...noteSettings } = body;
+    const body = notePayloadSchema.parse(req.body);
+    const transcript =
+      body.transcript && body.transcript.length > 0
+        ? body.transcript
+        : await getTranscript(body.videoId);
+
+    if (!transcript || transcript.length === 0) {
+      throw new ExpressError("A transcript is not available for this video.", 422);
+    }
+
+    const markdown = await generateNotes(body.videoId, transcript, body);
+    const { videoId: _videoId, videoTitle, transcript: _t, ...noteSettings } = body;
     
     // Extract title from generated A4 cover header if not explicitly provided
     const extractedTitleMatch = markdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i) ||
@@ -41,8 +65,15 @@ router.post("/", async (req, res, next) => {
 
 router.post("/stream", async (req, res) => {
   try {
-    const body = settings.extend({ videoId, videoTitle: z.string().trim().min(1).max(300).optional() }).parse(req.body);
-    const transcript = await getTranscript(body.videoId);
+    const body = notePayloadSchema.parse(req.body);
+    const transcript =
+      body.transcript && body.transcript.length > 0
+        ? body.transcript
+        : await getTranscript(body.videoId);
+
+    if (!transcript || transcript.length === 0) {
+      throw new ExpressError("A transcript is not available for this video.", 422);
+    }
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
