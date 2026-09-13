@@ -73,28 +73,20 @@ const applyTranslucentColorPaletteToSvg = (svgEl: SVGSVGElement | HTMLElement, t
         svgShape.style.strokeWidth = '1.75px';
         svgShape.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.04))';
         if (shape.tagName.toLowerCase() === 'rect') {
-          shape.setAttribute('rx', '8');
-          shape.setAttribute('ry', '8');
+          svgShape.setAttribute('rx', '6');
+          svgShape.setAttribute('ry', '6');
         }
       }
     });
 
-    // Ensure foreignObjects and text containers do not clip multi-line text
-    const foreignObjects = nodeGroup.querySelectorAll('foreignObject');
-    foreignObjects.forEach((fo) => {
-      fo.setAttribute('overflow', 'visible');
-      (fo as SVGElement).style.overflow = 'visible';
-    });
-
-    // Make text readable, bold, properly spaced, and prevent clipping
-    const labelElements = nodeGroup.querySelectorAll('.label div, .label span, .label p, text');
+    // Make text readable and color-matched without overriding layout geometry
+    const labelElements = nodeGroup.querySelectorAll('.label div, .label span, .label p, text, text tspan');
     labelElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
       htmlEl.style.color = color.text;
-      htmlEl.style.fontWeight = '600';
-      htmlEl.style.fontSize = '12px';
-      htmlEl.style.lineHeight = '1.3';
-      htmlEl.style.overflow = 'visible';
+      if (el.tagName.toLowerCase() === 'text' || el.tagName.toLowerCase() === 'tspan') {
+        (el as SVGElement).style.fill = color.text;
+      }
     });
   });
 
@@ -106,8 +98,8 @@ const applyTranslucentColorPaletteToSvg = (svgEl: SVGSVGElement | HTMLElement, t
     svgCluster.style.stroke = '#cbd5e1';
     svgCluster.style.strokeWidth = '1.5px';
     svgCluster.style.strokeDasharray = '4 4';
-    svgCluster.setAttribute('rx', '10');
-    svgCluster.setAttribute('ry', '10');
+    svgCluster.setAttribute('rx', '8');
+    svgCluster.setAttribute('ry', '8');
   });
 };
 
@@ -372,9 +364,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 suppressErrorRendering: true,
                 flowchart: {
                   curve: 'basis',
-                  padding: 24,
-                  nodeSpacing: 50,
-                  rankSpacing: 45,
+                  padding: 18,
+                  nodeSpacing: 45,
+                  rankSpacing: 40,
                   htmlLabels: true,
                   useMaxWidth: true,
                 },

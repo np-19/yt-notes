@@ -877,27 +877,21 @@ div.mermaid svg,
   margin-right: auto !important;
   display: block !important;
   background: transparent !important;
-  overflow: visible !important;
 }
 
-/* Prevent text clipping in Mermaid nodes */
-.mermaid foreignObject,
-.note-content .mermaid foreignObject {
-  overflow: visible !important;
-}
-.mermaid .label,
-.note-content .mermaid .label {
-  overflow: visible !important;
+/* Compact, clean Mermaid node text metrics */
+.mermaid .node .label,
+.note-content .mermaid .node .label {
+  text-align: center;
 }
 .mermaid .node .label div,
 .mermaid .node .label span,
 .mermaid .node .label p,
 .note-content .mermaid .node .label div {
-  line-height: 1.35 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
   word-break: break-word !important;
-  white-space: normal !important;
-  padding: 1px 2px !important;
-  overflow: visible !important;
 }
 
 .diagram-error { color: #9a4b3b; font-size: 12px; }
