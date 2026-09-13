@@ -74,14 +74,24 @@ export function applyTranslucentColorPaletteToSvg(svgEl: SVGSVGElement | HTMLEle
       }
     });
 
-    // Make text readable, bold, and high-contrast
+    // Make text readable, bold, high-contrast, and prevent clipping
     const labelElements = nodeGroup.querySelectorAll('.label div, .label span, .label p, text');
     labelElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
       htmlEl.style.color = color.text;
       htmlEl.style.fontWeight = '600';
-      htmlEl.style.fontSize = '12.5px';
+      htmlEl.style.fontSize = '12px';
+      htmlEl.style.lineHeight = '1.35';
+      htmlEl.style.textAlign = 'center';
+      htmlEl.style.wordBreak = 'normal';
+      htmlEl.style.overflowWrap = 'break-word';
     });
+  });
+
+  // Ensure all foreignObjects and labels inside SVG have visible overflow
+  const foreignObjects = svgEl.querySelectorAll('foreignObject, .label, .node');
+  foreignObjects.forEach((fo) => {
+    (fo as HTMLElement).style.overflow = 'visible';
   });
 
   // Style subgraphs / clusters with subtle translucent slate background
@@ -172,15 +182,15 @@ export function useNoteRenderer({
               suppressErrorRendering: true,
               flowchart: {
                 curve: 'basis',
-                padding: 16,
-                nodeSpacing: 50,
-                rankSpacing: 45,
+                padding: 24,
+                nodeSpacing: 45,
+                rankSpacing: 40,
                 htmlLabels: true,
                 useMaxWidth: true,
               },
               themeVariables: {
                 fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-                fontSize: '13px',
+                fontSize: '12.5px',
                 primaryColor: '#f8fafc',
                 primaryBorderColor: '#cbd5e1',
                 primaryTextColor: '#0f172a',
@@ -266,8 +276,9 @@ export function useNoteRenderer({
                     svgEl.style.marginLeft = 'auto';
                     svgEl.style.marginRight = 'auto';
                     svgEl.style.maxWidth = '100%';
-                    svgEl.style.maxHeight = '420px';
-                    svgEl.style.width = 'auto';
+                    svgEl.style.height = 'auto';
+                    svgEl.style.maxHeight = 'none';
+                    svgEl.style.overflow = 'visible';
                   }
                 }
               } catch (diagramErr) {

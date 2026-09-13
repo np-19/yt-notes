@@ -850,7 +850,7 @@ button:disabled {
   font-size: 16px;
 }
 
-/* Mermaid Diagrams - Transparent background, perfectly centered */
+/* Mermaid Diagrams - Transparent background, perfectly centered & responsive */
 .note-content .mermaid,
 .mermaid,
 div.mermaid {
@@ -872,11 +872,22 @@ div.mermaid svg,
 .note-content svg {
   width: auto !important;
   max-width: 100% !important;
-  max-height: 420px !important;
+  height: auto !important;
   margin-left: auto !important;
   margin-right: auto !important;
   display: block !important;
   background: transparent !important;
+  overflow: visible !important;
+}
+.mermaid svg foreignObject {
+  overflow: visible !important;
+}
+.mermaid .label div,
+.mermaid .label span,
+.mermaid .node text {
+  line-height: 1.35 !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
 .diagram-error { color: #9a4b3b; font-size: 12px; }
 
