@@ -11,6 +11,97 @@ import 'prismjs/themes/prism-tomorrow.css';
 
 import { notesApi } from '../api/notes.api';
 
+// Curated theme palettes with translucent background fills and matching vibrant borders
+const MERMAID_PALETTES: Record<string, { fill: string; stroke: string; text: string }[]> = {
+  amber: [
+    { fill: 'rgba(254, 243, 199, 0.72)', stroke: '#f59e0b', text: '#78350f' },
+    { fill: 'rgba(255, 237, 213, 0.72)', stroke: '#f97316', text: '#7c2d12' },
+    { fill: 'rgba(254, 252, 232, 0.72)', stroke: '#eab308', text: '#713f12' },
+    { fill: 'rgba(240, 253, 244, 0.72)', stroke: '#10b981', text: '#14532d' },
+    { fill: 'rgba(239, 246, 255, 0.72)', stroke: '#3b82f6', text: '#1e3a8a' },
+    { fill: 'rgba(250, 245, 255, 0.72)', stroke: '#a855f7', text: '#581c87' },
+  ],
+  cobalt: [
+    { fill: 'rgba(219, 234, 254, 0.72)', stroke: '#3b82f6', text: '#1e3a8a' },
+    { fill: 'rgba(224, 242, 254, 0.72)', stroke: '#0284c7', text: '#0c4a6e' },
+    { fill: 'rgba(238, 242, 255, 0.72)', stroke: '#6366f1', text: '#312e81' },
+    { fill: 'rgba(240, 253, 250, 0.72)', stroke: '#14b8a6', text: '#134e4a' },
+    { fill: 'rgba(245, 243, 255, 0.72)', stroke: '#8b5cf6', text: '#4c1d95' },
+    { fill: 'rgba(254, 242, 242, 0.72)', stroke: '#f43f5e', text: '#881337' },
+  ],
+  emerald: [
+    { fill: 'rgba(209, 250, 229, 0.72)', stroke: '#10b981', text: '#064e3b' },
+    { fill: 'rgba(204, 251, 241, 0.72)', stroke: '#14b8a6', text: '#134e4a' },
+    { fill: 'rgba(236, 253, 245, 0.72)', stroke: '#059669', text: '#065f46' },
+    { fill: 'rgba(254, 243, 199, 0.72)', stroke: '#f59e0b', text: '#78350f' },
+    { fill: 'rgba(224, 242, 254, 0.72)', stroke: '#0284c7', text: '#0c4a6e' },
+    { fill: 'rgba(255, 237, 213, 0.72)', stroke: '#f97316', text: '#7c2d12' },
+  ],
+  coral: [
+    { fill: 'rgba(255, 237, 213, 0.72)', stroke: '#f97316', text: '#7c2d12' },
+    { fill: 'rgba(254, 243, 199, 0.72)', stroke: '#f59e0b', text: '#78350f' },
+    { fill: 'rgba(254, 226, 226, 0.72)', stroke: '#ef4444', text: '#7f1d1d' },
+    { fill: 'rgba(255, 228, 230, 0.72)', stroke: '#f43f5e', text: '#881337' },
+    { fill: 'rgba(254, 249, 195, 0.72)', stroke: '#eab308', text: '#713f12' },
+    { fill: 'rgba(243, 232, 255, 0.72)', stroke: '#a855f7', text: '#581c87' },
+  ],
+  violet: [
+    { fill: 'rgba(243, 232, 255, 0.72)', stroke: '#a855f7', text: '#581c87' },
+    { fill: 'rgba(238, 242, 255, 0.72)', stroke: '#818cf8', text: '#312e81' },
+    { fill: 'rgba(253, 232, 248, 0.72)', stroke: '#ec4899', text: '#701a75' },
+    { fill: 'rgba(219, 234, 254, 0.72)', stroke: '#3b82f6', text: '#1e3a8a' },
+    { fill: 'rgba(209, 250, 229, 0.72)', stroke: '#10b981', text: '#064e3b' },
+    { fill: 'rgba(255, 237, 213, 0.72)', stroke: '#f97316', text: '#7c2d12' },
+  ],
+};
+
+const applyTranslucentColorPaletteToSvg = (svgEl: SVGSVGElement | HTMLElement, themeId: string) => {
+  if (!svgEl) return;
+  const palette = MERMAID_PALETTES[themeId] || MERMAID_PALETTES.amber;
+  const nodeGroups = svgEl.querySelectorAll('g.node, g.actor');
+
+  nodeGroups.forEach((nodeGroup, index) => {
+    const color = palette[index % palette.length];
+
+    // Apply translucent fill and crisp matching stroke to node shape (rect, polygon, circle, path)
+    const shapes = nodeGroup.querySelectorAll('rect, polygon, circle, path');
+    shapes.forEach((shape) => {
+      if (!shape.closest('.label') && !shape.classList.contains('arrowhead') && !shape.classList.contains('flowchart-link')) {
+        const svgShape = shape as SVGElement;
+        svgShape.style.fill = color.fill;
+        svgShape.style.stroke = color.stroke;
+        svgShape.style.strokeWidth = '1.75px';
+        svgShape.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.04))';
+        if (shape.tagName.toLowerCase() === 'rect') {
+          shape.setAttribute('rx', '8');
+          shape.setAttribute('ry', '8');
+        }
+      }
+    });
+
+    // Make text readable, bold, and high-contrast
+    const labelElements = nodeGroup.querySelectorAll('.label div, .label span, .label p, text');
+    labelElements.forEach((el) => {
+      const htmlEl = el as HTMLElement;
+      htmlEl.style.color = color.text;
+      htmlEl.style.fontWeight = '600';
+      htmlEl.style.fontSize = '12.5px';
+    });
+  });
+
+  // Style subgraphs / clusters with subtle translucent slate background
+  const clusters = svgEl.querySelectorAll('g.cluster rect');
+  clusters.forEach((cluster) => {
+    const svgCluster = cluster as SVGElement;
+    svgCluster.style.fill = 'rgba(248, 250, 252, 0.85)';
+    svgCluster.style.stroke = '#cbd5e1';
+    svgCluster.style.strokeWidth = '1.5px';
+    svgCluster.style.strokeDasharray = '4 4';
+    svgCluster.setAttribute('rx', '10');
+    svgCluster.setAttribute('ry', '10');
+  });
+};
+
 export interface NoteEditorProps {
   note: Note;
   activeThemeId: string;
@@ -364,6 +455,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
                     const svgEl = targetContainer.querySelector('svg');
                     if (svgEl) {
+                      applyTranslucentColorPaletteToSvg(svgEl, activeThemeId);
                       svgEl.style.display = 'block';
                       svgEl.style.marginLeft = 'auto';
                       svgEl.style.marginRight = 'auto';
@@ -389,16 +481,12 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         renderMermaidDiagrams();
       }
 
-      // 5. Force center on all mermaid SVGs & flow diagrams
+      // 5. Force center and re-apply color palettes on all mermaid SVGs & flow diagrams
       try {
         const allSvgs = containerRef.current.querySelectorAll('.mermaid svg, svg.flowchart, [id^="mermaid-svg"]');
         allSvgs.forEach((svg) => {
+          applyTranslucentColorPaletteToSvg(svg as SVGSVGElement, activeThemeId);
           const svgEl = svg as SVGElement;
-          svgEl.style.setProperty('margin', '0 auto', 'important');
-          svgEl.style.setProperty('display', 'block', 'important');
-          svgEl.style.setProperty('max-width', '100%', 'important');
-          svgEl.style.setProperty('max-height', '420px', 'important');
-          svgEl.style.setProperty('width', 'auto', 'important');
           if (svgEl.parentElement) {
             svgEl.parentElement.style.setProperty('text-align', 'center', 'important');
             svgEl.parentElement.style.setProperty('display', 'flex', 'important');
