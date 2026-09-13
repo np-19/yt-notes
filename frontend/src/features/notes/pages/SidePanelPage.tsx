@@ -300,11 +300,38 @@ export const SidePanelPage: React.FC = () => {
               activeThemeId={activeThemeId}
               isStreaming={isStreaming}
               onThemeChange={setTheme}
-              onUpdateContent={(html, label) => {
+              onUpdateContent={async (html, label) => {
                 updateContent(html, label);
-                setActiveNote((prev) => (prev ? { ...prev, htmlContent: html } : prev));
+                const now = new Date().toISOString();
+                const versionLabel = label || `Refined ${new Date().toLocaleTimeString()}`;
+                const newVersion = {
+                  id: `v-${Date.now()}`,
+                  timestamp: now,
+                  label: versionLabel,
+                  htmlContent: html,
+                };
+                const updatedDoc: Note = {
+                  ...activeNote,
+                  htmlContent: html,
+                  updatedAt: now,
+                  versions: [newVersion, ...(activeNote.versions || [])],
+                };
+                setActiveNote(updatedDoc);
+                await notesApi.saveNote(updatedDoc);
               }}
-              onRestoreVersion={restoreVersion}
+              onRestoreVersion={async (versionId) => {
+                restoreVersion(versionId);
+                const target = activeNote.versions?.find((v) => v.id === versionId);
+                if (target) {
+                  const updatedDoc: Note = {
+                    ...activeNote,
+                    htmlContent: target.htmlContent,
+                    updatedAt: new Date().toISOString(),
+                  };
+                  setActiveNote(updatedDoc);
+                  await notesApi.saveNote(updatedDoc);
+                }
+              }}
             />
           </div>
         ) : null}

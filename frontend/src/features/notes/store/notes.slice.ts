@@ -94,6 +94,10 @@ export const notesSlice = createSlice({
         state.currentNote.htmlContent = newHtml;
         state.currentNote.updatedAt = new Date().toISOString();
         state.currentNote.versions = [newVersion, ...(state.currentNote.versions || [])];
+        const idx = state.notes.findIndex((n) => n.id === state.currentNote!.id);
+        if (idx >= 0) {
+          state.notes[idx] = { ...state.currentNote };
+        }
       }
     },
     restoreNoteVersion: (state, action: PayloadAction<string>) => {
@@ -102,6 +106,10 @@ export const notesSlice = createSlice({
         if (version) {
           state.currentNote.htmlContent = version.htmlContent;
           state.currentNote.updatedAt = new Date().toISOString();
+          const idx = state.notes.findIndex((n) => n.id === state.currentNote!.id);
+          if (idx >= 0) {
+            state.notes[idx] = { ...state.currentNote };
+          }
         }
       }
     },
