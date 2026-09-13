@@ -17,7 +17,7 @@ export interface VideoDetailsResult {
 /**
  * Fetch public video metadata using YouTube's oEmbed endpoint
  */
-async function fetchOEmbedDetails(videoId: string): Promise<{ title?: string | undefined; author?: string | undefined }> {
+export async function fetchOEmbedDetails(videoId: string): Promise<{ title?: string | undefined; author?: string | undefined }> {
   try {
     const res = await fetch(
       `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&format=json`,

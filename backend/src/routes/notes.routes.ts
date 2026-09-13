@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { getVideoDetailsAndTranscript } from "../services/yt.transcript.js";
+import { fetchOEmbedDetails, getVideoDetailsAndTranscript } from "../services/yt.transcript.js";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
 
@@ -30,7 +30,7 @@ const notePayloadSchema = settings.extend({
 type NotePayload = z.infer<typeof notePayloadSchema>;
 
 async function prepareSynthesisContext(body: NotePayload) {
-  let transcript = body.transcript || [];
+  const transcript = body.transcript || [];
   let resolvedTitle = body.videoTitle?.trim();
 
   const isGenericTitle =
@@ -40,13 +40,10 @@ async function prepareSynthesisContext(body: NotePayload) {
     resolvedTitle.startsWith("Technical Lecture (") ||
     resolvedTitle.startsWith("YouTube Lecture (");
 
-  if (transcript.length === 0 || isGenericTitle) {
-    const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
-    if (transcript.length === 0 && videoInfo.transcript.length > 0) {
-      transcript = videoInfo.transcript;
-    }
-    if (isGenericTitle && videoInfo.title) {
-      resolvedTitle = videoInfo.title;
+  if (isGenericTitle) {
+    const oembed = await fetchOEmbedDetails(body.videoId);
+    if (oembed.title) {
+      resolvedTitle = oembed.title;
     }
   }
 

@@ -34,11 +34,18 @@ export function buildNotesPrompt(
   transcript: TranscriptEntry[],
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
 ): string {
-  const lectureTitle = settings.videoTitle?.trim() || `Technical Lecture (${videoId})`;
+  const isGeneric =
+    !settings.videoTitle ||
+    settings.videoTitle === "Synthesized Academic Notes" ||
+    settings.videoTitle.startsWith("Lecture Notes —") ||
+    settings.videoTitle.startsWith("Technical Lecture (") ||
+    settings.videoTitle.startsWith("YouTube Lecture (");
+
+  const lectureTitle = !isGeneric ? settings.videoTitle?.trim() || "" : "";
   const transcriptSection =
     transcript && transcript.length > 0
       ? `Timestamped Transcript:\n${transcript.map((entry) => `[${entry.offset}ms] ${entry.text}`).join("\n")}`
-      : `Lecture Topic / Subject: "${lectureTitle}" (YouTube Video ID: ${videoId}).\nNote: Synthesize the definitive, high-depth technical study guide covering this topic in full academic rigor with foundational principles, architectures, algorithms, equations, diagrams, and concrete implementation examples.`;
+      : `YouTube Video ID: ${videoId}${lectureTitle ? `\nVideo Title: "${lectureTitle}"` : ""}.\nNote: Ingest and synthesize the definitive, high-depth technical study guide covering this video in full academic rigor with foundational principles, architectures, algorithms, equations, diagrams, and concrete implementation examples.`;
 
   const customInstruction = settings.customPrompt?.trim()
     ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`
@@ -117,11 +124,11 @@ ${lengthAndDepthInstruction}
 CRITICAL FORMATTING & CONTENT RULES:
 - OUTPUT FORMAT: Return clean Markdown only. Do not wrap the entire response in a top-level code block.
 - NO EMOJIS: Never use emojis anywhere. Use minimalistic typographic symbols only: ✓ for yes/positive, ✗ for no/negative, and → for flow arrows.
-- STANDALONE A4 FRONT COVER PAGE: Always begin the document with the exact full A4 cover page header format below:
+- STANDALONE A4 FRONT COVER PAGE: Always begin the document with the exact A4 cover page header format below:
   <header class="note-cover">
-    <h1>${lectureTitle}</h1>
+    <h1>${lectureTitle || "[Determine and insert the exact, specific title of this video here]"}</h1>
     <p class="subtitle">${coverSubtitle}</p>
-    <p class="description">[Executive Summary: 2-3 dense, rigorous sentences summarizing the foundational architectural invariants, core problem domains, data structures, algorithms, and key tradeoffs addressed in this lecture.]</p>
+    <p class="description">[Write 2-3 dense, rigorous sentences summarizing the specific topics, key mechanisms, and main takeaways actually covered in this lecture]</p>
     <div class="badge-pill">${coverBadge}</div>
   </header>
 - NUMBERED HEADINGS (Following the cover page):
