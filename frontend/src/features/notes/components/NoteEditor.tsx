@@ -765,7 +765,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </form>
       </div>
 
-      {/* Floating Selection Toolbar - Wide & Minimalist */}
+      {/* Floating Selection Toolbar - Rounded-Full Minimalist Pill Design */}
       {selectionRect && selectedText && !isEditing && (
         <div
           ref={floatingBarRef}
@@ -776,24 +776,30 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             transform: 'translateX(-50%)',
             zIndex: 50,
           }}
-          className="ai-refine-interactive bg-stone-950 text-stone-100 shadow-2xl border border-stone-800 rounded-xl px-2 py-1.5 flex items-center gap-2 w-[580px] max-w-[94vw] ring-1 ring-white/10 backdrop-blur-md"
+          className="ai-refine-interactive bg-[#232326] text-white shadow-2xl border border-neutral-700/70 rounded-full pl-3.5 pr-2 py-1.5 flex items-center gap-2 w-[540px] max-w-[94vw] ring-1 ring-black/50 backdrop-blur-md"
         >
-          {/* Word Count Tag */}
-          <div className="flex items-center px-2 py-1 rounded bg-stone-900 text-stone-300 text-[11px] font-mono whitespace-nowrap border border-stone-800">
-            {selectedText.split(/\s+/).filter(Boolean).length} words
-          </div>
+          {/* Word Count */}
+          <span className="text-neutral-400 text-xs font-mono select-none flex-shrink-0">
+            {selectedText.split(/\s+/).filter(Boolean).length}w
+          </span>
+
+          {/* Vertical Divider */}
+          <div className="h-4 w-[1px] bg-neutral-700/80 flex-shrink-0" />
 
           {/* Pin Chunk Action */}
           <button
             type="button"
             onClick={() => addChunkToSelection()}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-stone-900 hover:bg-stone-800 text-stone-200 border border-stone-700/80 transition-colors cursor-pointer whitespace-nowrap"
-            title="Pin this snippet to multi-chunk selection"
+            className="flex items-center gap-1.5 text-neutral-300 hover:text-white text-xs font-medium px-2 py-1 rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer flex-shrink-0"
+            title="Pin snippet for multi-chunk refinement"
           >
-            <span>+ Pin Chunk</span>
+            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            <span>Pin</span>
             {selectedChunks.length > 0 && (
-              <span className="bg-amber-600 text-white text-[10px] font-mono font-bold px-1.5 rounded-full">
-                {selectedChunks.length + 1}
+              <span className="bg-orange-500 text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full">
+                {selectedChunks.length}
               </span>
             )}
           </button>
@@ -805,22 +811,34 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               const targets = selectedChunks.length > 0 ? [...selectedChunks, selectedText] : selectedText;
               executeRefine(floatingPrompt, targets);
             }}
-            className="flex items-center gap-1.5 flex-1 min-w-0"
+            className="flex items-center gap-2 flex-1 min-w-0"
           >
             <input
               type="text"
               value={floatingPrompt}
               onChange={(e) => setFloatingPrompt(e.target.value)}
-              placeholder="Refinement instruction (e.g. rewrite as table, add code)..."
-              className="flex-1 min-w-0 px-3 py-1.5 text-xs bg-stone-900/90 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-sans"
+              placeholder="Refine selection..."
+              className="flex-1 min-w-0 bg-transparent text-white placeholder-neutral-500 text-xs sm:text-sm focus:outline-none font-sans px-1"
               autoFocus
             />
+
+            {/* Circular Orange Action Button */}
             <button
               type="submit"
               disabled={isAiRefining}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 flex-shrink-0"
+              className="w-7 h-7 rounded-full bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center transition-all flex-shrink-0 disabled:opacity-50 shadow-sm active:scale-95 cursor-pointer"
+              title="Apply Refinement"
             >
-              {isAiRefining ? 'Refining...' : 'Refine'}
+              {isAiRefining ? (
+                <svg className="animate-spin w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              )}
             </button>
           </form>
 
@@ -831,7 +849,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               setSelectedText('');
               setSelectionRect(null);
             }}
-            className="text-stone-400 hover:text-white p-1 text-xs rounded hover:bg-stone-800 cursor-pointer flex-shrink-0"
+            className="text-neutral-500 hover:text-neutral-200 p-1 rounded-full transition-colors flex-shrink-0 cursor-pointer text-xs"
             title="Dismiss selection"
           >
             ✕
