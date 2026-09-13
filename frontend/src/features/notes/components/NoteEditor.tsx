@@ -79,13 +79,22 @@ const applyTranslucentColorPaletteToSvg = (svgEl: SVGSVGElement | HTMLElement, t
       }
     });
 
-    // Make text readable, bold, and high-contrast
+    // Ensure foreignObjects and text containers do not clip multi-line text
+    const foreignObjects = nodeGroup.querySelectorAll('foreignObject');
+    foreignObjects.forEach((fo) => {
+      fo.setAttribute('overflow', 'visible');
+      (fo as SVGElement).style.overflow = 'visible';
+    });
+
+    // Make text readable, bold, properly spaced, and prevent clipping
     const labelElements = nodeGroup.querySelectorAll('.label div, .label span, .label p, text');
     labelElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
       htmlEl.style.color = color.text;
       htmlEl.style.fontWeight = '600';
-      htmlEl.style.fontSize = '12.5px';
+      htmlEl.style.fontSize = '12px';
+      htmlEl.style.lineHeight = '1.3';
+      htmlEl.style.overflow = 'visible';
     });
   });
 
@@ -363,7 +372,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 suppressErrorRendering: true,
                 flowchart: {
                   curve: 'basis',
-                  padding: 16,
+                  padding: 24,
                   nodeSpacing: 50,
                   rankSpacing: 45,
                   htmlLabels: true,
@@ -371,7 +380,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 },
                 themeVariables: {
                   fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   // Cohesive, unified slate & theme palette (no rainbow borders)
                   primaryColor: '#f8fafc',
                   primaryBorderColor: '#cbd5e1',

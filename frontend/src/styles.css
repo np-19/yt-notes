@@ -872,12 +872,34 @@ div.mermaid svg,
 .note-content svg {
   width: auto !important;
   max-width: 100% !important;
-  max-height: 420px !important;
+  max-height: 480px !important;
   margin-left: auto !important;
   margin-right: auto !important;
   display: block !important;
   background: transparent !important;
+  overflow: visible !important;
 }
+
+/* Prevent text clipping in Mermaid nodes */
+.mermaid foreignObject,
+.note-content .mermaid foreignObject {
+  overflow: visible !important;
+}
+.mermaid .label,
+.note-content .mermaid .label {
+  overflow: visible !important;
+}
+.mermaid .node .label div,
+.mermaid .node .label span,
+.mermaid .node .label p,
+.note-content .mermaid .node .label div {
+  line-height: 1.35 !important;
+  word-break: break-word !important;
+  white-space: normal !important;
+  padding: 1px 2px !important;
+  overflow: visible !important;
+}
+
 .diagram-error { color: #9a4b3b; font-size: 12px; }
 
 /* Grid 2 */
