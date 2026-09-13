@@ -139,17 +139,28 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
    - FACT CHECKING: If the speaker misstates a fact, makes a technical slip-up, or teaches an outdated/incorrect definition, state the correct standard fact in the notes and add a clear callout:
      > **Technical Note / Correction:** [Briefly clarify the accurate standard definition or industry best practice]
 
-3. VISUALS & ON-SCREEN DIAGRAMS:
+3. VISUALS & ON-SCREEN DIAGRAMS (STRICT MERMAID RULES):
    ${diagramInstruction}
-   - When diagrams appear on screen (e.g., flowcharts, architecture maps, ER diagrams, sequence flows, class hierarchies), recreate them faithfully using \`\`\`mermaid code blocks.
-   - Use clean, double-quoted node labels like \`A["User Request"]\` and readable layout directions (\`graph TD\` or \`graph LR\`).
+   - When diagrams appear on screen (e.g., flowcharts, architecture maps, sequence flows, state machines), recreate them faithfully using \`\`\`mermaid code blocks.
+   - MANDATORY MERMAID SYNTAX RULES (To prevent syntax crashes):
+     a. ALWAYS double-quote EVERY node label containing spaces, colons, parentheses, brackets, or slashes:
+        ✓ DO: \`A["Client (React App)"] --> B["API Gateway: 8080"]\`
+        ✗ NEVER: \`A[Client (React App)] --> B[API Gateway: 8080]\` (unquoted parens/colons crash the parser)
+     b. Use standard valid diagram headers only: \`graph TD\`, \`graph LR\`, \`sequenceDiagram\`, or \`stateDiagram-v2\`.
+     c. Use simple alphanumeric IDs for nodes (e.g., \`client\`, \`srv1\`, \`db_cluster\`). NEVER use reserved words (\`end\`, \`node\`, \`graph\`, \`subgraph\`) as node IDs.
+     d. In \`sequenceDiagram\`, wrap labels in quotes: \`Client->>Server: "POST /auth/login (JWT)"\`.
 
 4. CODE SNIPPETS & EXAMPLES:
    ${settings.includeCode ? "- Extract and format code snippets shown on screen using syntax-highlighted code blocks (```python, ```typescript, ```java, ```sql, etc.)." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points."}
    ${examplesInstruction}
 
-5. MATH & FORMULAS:
-   ${settings.detailedMath ? "- Format equations, mathematical formulas, and asymptotic complexity in LaTeX ($$ ... $$ for block math, $...$ for inline math)." : "- Keep mathematical and complexity notations simple and inline."}
+5. MATH, FORMULAS & CODE FORMATTING RULES (STRICT LATEX RULES):
+   ${settings.detailedMath ? "- Use LaTeX ($$ ... $$ for display math, $...$ for inline math) ONLY for pure mathematical equations, arithmetic proofs, probability, and Big-O asymptotic notation (e.g., $O(N \\log N)$, $T(n) = 2T(n/2) + O(n)$)." : "- Keep mathematical and complexity notations simple and inline."}
+   - ABSOLUTE PROHIBITION: NEVER put SQL queries, database schema statements, API endpoints, variable names, or programming code inside LaTeX math ($$ or $). Format SQL/code strictly as inline backticks (\`SELECT * FROM ...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`).
+   - LATEX ESCAPING RULES:
+     a. In LaTeX math, all literal underscores must be escaped as \\_ (e.g. \$\\text{max\\_connections}\$).
+     b. In LaTeX math, percent signs must be escaped as \\% (e.g. \$99.9\\%\$ availability).
+     c. For regular currency in prose, write "50 USD" or "\\$50" to avoid accidentally triggering math mode.
 
 ${customInstruction ? `6. USER CUSTOM FOCUS:\n${customInstruction}` : ""}
 
@@ -179,37 +190,30 @@ ${transcriptSection}
 }
 
 export function buildEditPrompt(markdown: string, instruction: string, selection?: string): string {
-  if (selection && selection.trim().length > 0) {
-    return `You are an expert technical note editor.
-Instruction: "${instruction}"
-Selected Text to refine:
+  const selectionBlock =
+    selection && selection.trim().length > 0
+      ? `Selected Text to modify/fix:
 """
-${selection}
-"""
+${selection.trim()}
+"""\n`
+      : "";
 
-Full Document Context:
+  return `You are an expert technical note editor and markdown formatter.
+Instruction: "${instruction}"
+
+${selectionBlock}Full Document Context:
 """
 ${markdown}
 """
 
-Task:
-1. Apply the user's instruction specifically to the Selected Text within the document context.
-2. Return the COMPLETE revised markdown document.
-3. Preserve all existing CSS classes, HTML cover headers, Mermaid diagrams, and LaTeX math formulas.
-4. Output clean Markdown only, no meta-commentary or wrapping backticks.`;
-  }
-
-  return `You are an expert technical note editor.
-Instruction: "${instruction}"
-
-Document:
-"""
-${markdown}
-"""
-
-Task:
-1. Modify the document according to the user's instruction.
-2. Return the COMPLETE updated markdown document.
-3. Preserve all existing CSS classes (<header class="note-cover">, etc.), Mermaid diagrams, and LaTeX math formulas.
-4. Output clean Markdown only, no meta-commentary or wrapping backticks.`;
+Editing & Formatting Rules:
+1. Apply the user's instruction precisely to the document (or specifically to the selected section if provided).
+2. FIX FORMATTING & SYNTAX DEFECTS:
+   - If the text contains broken LaTeX, raw unescaped LaTeX tags (like \\text{...}), or red error formulas:
+     - If it contains SQL, database queries, code, or API endpoints (e.g. \`SELECT ...\`, \`WHERE id = ...\`), CONVERT it to clean inline code (\`...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`). NEVER leave SQL or code inside LaTeX math blocks.
+     - If it represents mathematical or Big-O complexity formulas, fix the LaTeX syntax (escape underscores as \\_, ensure balanced braces, and wrap with $...$ or $$...$$).
+   - Ensure tables, callouts, lists, and Mermaid diagrams are valid and properly formatted.
+3. Preserve all valid HTML cover headers (<header class="note-cover">...</header>), section structure, and valid Mermaid diagrams unless instructed to edit them.
+4. Return the COMPLETE updated markdown document.
+5. Output clean Markdown only, no meta-commentary, explanations, or top-level wrapping backticks.`;
 }
