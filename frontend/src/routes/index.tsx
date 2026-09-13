@@ -42,12 +42,12 @@ const HomePage: React.FC = () => {
       detailedMath,
     };
 
-    const topicTitle = topic || customTopic || 'Synthesized Academic Notes';
+    const topicTitle = (topic || customTopic || '').trim();
 
     const pendingDraft = {
       id: newNoteId,
       youtubeUrl: url.trim(),
-      customTopic: topicTitle,
+      customTopic: topicTitle || undefined,
       customPrompt: prompt || customPrompt || '',
       settings,
     };

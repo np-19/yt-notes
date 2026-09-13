@@ -89,7 +89,7 @@ export const SidePanelPage: React.FC = () => {
       const pendingDraft = {
         id: newNoteId,
         youtubeUrl: `https://www.youtube.com/watch?v=${videoId}`,
-        customTopic: customTopic || videoTitle || 'Synthesized Academic Notes',
+        customTopic: (customTopic || videoTitle || '').trim() || undefined,
         customPrompt: customPrompt || '',
         transcript: localTranscript && localTranscript.length > 0 ? localTranscript : undefined,
         settings: {

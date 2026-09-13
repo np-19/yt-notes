@@ -35,14 +35,9 @@ export const NotePage: React.FC = () => {
 
     const initialPlaceholder: Note = {
       id: noteId,
-      title: draftData.customTopic || 'Synthesized Academic Notes',
+      title: draftData.customTopic || 'Synthesizing Notes...',
       videoUrl: draftData.youtubeUrl,
-      htmlContent: `<header class="note-cover">
-  <h1>${draftData.customTopic || 'Synthesized Academic Notes'}</h1>
-  <p class="subtitle">Complete Technical Study Guide & Architecture Whitepaper</p>
-  <p class="description">Live synthesizing educational notes with diagrams, equations, and executive summary...</p>
-  <div class="badge-pill">⚡ Initializing Gemini Stream...</div>
-</header>`,
+      htmlContent: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       themeId: activeThemeId || 'amber',
@@ -246,7 +241,21 @@ export const NotePage: React.FC = () => {
           />
         )}
 
-        {activeDocument && (
+        {isStreaming && (!activeDocument || !activeDocument.htmlContent) && (
+          <div className="max-w-xl mx-auto my-16 p-10 bg-amber-50/60 dark:bg-stone-900/60 border border-amber-200/80 dark:border-stone-800 rounded-2xl shadow-sm text-center">
+            <div className="flex justify-center mb-4">
+              <Spinner size="lg" />
+            </div>
+            <h3 className="font-serif font-bold text-lg text-stone-900 dark:text-stone-100 mb-2">
+              Synthesizing Notes with Gemini
+            </h3>
+            <p className="text-xs text-stone-500 font-mono">
+              Ingesting video stream and streaming structured notes & diagrams...
+            </p>
+          </div>
+        )}
+
+        {activeDocument && activeDocument.htmlContent && (
           <NoteEditor
             note={activeDocument}
             activeThemeId={activeThemeId}

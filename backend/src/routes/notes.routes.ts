@@ -31,21 +31,28 @@ type NotePayload = z.infer<typeof notePayloadSchema>;
 
 async function prepareSynthesisContext(body: NotePayload) {
   let transcript = body.transcript || [];
-  let resolvedTitle = body.videoTitle;
+  let resolvedTitle = body.videoTitle?.trim();
 
-  if (transcript.length === 0 || !resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+  const isGenericTitle =
+    !resolvedTitle ||
+    resolvedTitle === "Synthesized Academic Notes" ||
+    resolvedTitle.startsWith("Lecture Notes —") ||
+    resolvedTitle.startsWith("Technical Lecture (") ||
+    resolvedTitle.startsWith("YouTube Lecture (");
+
+  if (transcript.length === 0 || isGenericTitle) {
     const videoInfo = await getVideoDetailsAndTranscript(body.videoId);
     if (transcript.length === 0 && videoInfo.transcript.length > 0) {
       transcript = videoInfo.transcript;
     }
-    if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+    if (isGenericTitle && videoInfo.title) {
       resolvedTitle = videoInfo.title;
     }
   }
 
   return {
     transcript,
-    resolvedTitle: resolvedTitle || `YouTube Lecture (${body.videoId})`,
+    resolvedTitle: resolvedTitle || `Lecture Notes — ${body.videoId}`,
   };
 }
 
