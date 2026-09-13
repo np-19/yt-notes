@@ -36,7 +36,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   const [isAiRefining, setIsAiRefining] = useState(false);
   const [activeTab, setActiveTab] = useState<'content' | 'toc' | 'history'>('content');
   
-  // Mouse Selection State
+  // Multi-Chunk Selection State
+  const [selectedChunks, setSelectedChunks] = useState<string[]>([]);
   const [selectedText, setSelectedText] = useState<string>('');
   const [selectionRect, setSelectionRect] = useState<{ top: number; left: number } | null>(null);
   const [floatingPrompt, setFloatingPrompt] = useState('');
@@ -47,6 +48,27 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
   useEffect(() => {
     setEditableHtml(note.htmlContent);
   }, [note.htmlContent]);
+
+  const addChunkToSelection = (textToAdd?: string) => {
+    const text = (textToAdd || selectedText).trim();
+    if (text && !selectedChunks.includes(text)) {
+      setSelectedChunks((prev) => [...prev, text]);
+    }
+    setSelectedText('');
+    setSelectionRect(null);
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const removeChunk = (index: number) => {
+    setSelectedChunks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllChunks = () => {
+    setSelectedChunks([]);
+    setSelectedText('');
+    setSelectionRect(null);
+    window.getSelection()?.removeAllRanges();
+  };
 
   // Handle Mouse Text Selection
   useEffect(() => {
@@ -72,7 +94,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           setSelectedText(text);
         }
       } else {
-        // Only clear if not clicking inside input
+        // Only clear active highlighted text if not clicking inside refinement UI
         if (!(e.target as HTMLElement)?.closest('.ai-refine-interactive')) {
           setSelectedText('');
           setSelectionRect(null);
@@ -486,7 +508,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     setIsEditing(false);
   };
 
-  const executeRefine = async (instruction: string, targetSelection?: string) => {
+  const executeRefine = async (instruction: string, targetSelection?: string | string[]) => {
     if (!instruction.trim()) return;
 
     setIsAiRefining(true);
@@ -500,6 +522,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       setAiPrompt('');
       setFloatingPrompt('');
       setSelectedText('');
+      setSelectedChunks([]);
       setSelectionRect(null);
     } catch (err) {
       console.warn('AI Refinement failed:', err);
@@ -510,7 +533,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
   const handleRefineSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await executeRefine(aiPrompt, selectedText || undefined);
+    const targets =
+      selectedChunks.length > 0
+        ? selectedChunks
+        : selectedText
+        ? [selectedText]
+        : undefined;
+    await executeRefine(aiPrompt, targets);
   };
 
   const selectedTheme = NOTE_THEMES.find((t) => t.id === activeThemeId) || NOTE_THEMES[0];
@@ -651,50 +680,92 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
       )}
 
-      {/* AI Refinement Box with Active Target Selection Indicator */}
-      <div className="no-print bg-white p-4 rounded-xl border border-stone-200 shadow-sm mb-6 space-y-2 ai-refine-interactive">
-        {selectedText && (
-          <div className="flex items-center justify-between gap-2 bg-amber-50 border border-amber-200/90 px-3 py-1.5 rounded-lg text-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="flex-shrink-0 font-mono font-bold uppercase text-[10px] px-1.5 py-0.5 rounded bg-amber-200/80 text-amber-900">
-                🎯 Target Selection ({selectedText.split(/\s+/).filter(Boolean).length} words)
+      {/* Refinement Control Box with Multi-Chunk Selection Indicator */}
+      <div className="no-print bg-stone-50 border border-stone-200/90 rounded-xl p-3.5 shadow-xs mb-6 space-y-3 ai-refine-interactive">
+        {(selectedChunks.length > 0 || selectedText) && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[11px] font-semibold tracking-wide text-stone-600 uppercase">
+                Targeted Selection ({selectedChunks.length + (selectedText && !selectedChunks.includes(selectedText) ? 1 : 0)} {selectedChunks.length + (selectedText && !selectedChunks.includes(selectedText) ? 1 : 0) === 1 ? 'chunk' : 'chunks'})
               </span>
-              <span className="text-stone-700 italic truncate font-sans text-xs">
-                "{selectedText.slice(0, 100)}{selectedText.length > 100 ? '...' : ''}"
-              </span>
+              <button
+                type="button"
+                onClick={clearAllChunks}
+                className="text-stone-500 hover:text-stone-800 font-mono text-[11px] underline cursor-pointer"
+              >
+                Clear (Apply to Entire Document)
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedText('');
-                setSelectionRect(null);
-              }}
-              className="text-stone-500 hover:text-stone-800 font-mono text-[11px] underline flex-shrink-0 cursor-pointer"
-            >
-              Clear (Refine All)
-            </button>
+
+            <div className="flex flex-wrap gap-2">
+              {selectedChunks.map((chunk, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-2 bg-white border border-stone-300/80 px-3 py-1 rounded-lg text-xs max-w-full sm:max-w-md shadow-2xs"
+                >
+                  <span className="font-mono font-medium text-[10px] text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <span className="text-stone-800 truncate text-xs flex-1">
+                    "{chunk.slice(0, 50)}{chunk.length > 50 ? '...' : ''}"
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeChunk(idx)}
+                    className="text-stone-400 hover:text-stone-800 hover:bg-stone-100 p-0.5 rounded flex-shrink-0 font-mono text-xs cursor-pointer ml-1"
+                    title="Remove chunk"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+
+              {selectedText && !selectedChunks.includes(selectedText) && (
+                <div className="flex items-center gap-2 bg-stone-100/70 border border-stone-300 border-dashed px-3 py-1 rounded-lg text-xs max-w-full sm:max-w-md">
+                  <span className="font-mono font-medium text-[10px] text-stone-500 bg-stone-200/70 px-1.5 py-0.5 rounded flex-shrink-0">
+                    Active
+                  </span>
+                  <span className="text-stone-600 truncate text-xs flex-1">
+                    "{selectedText.slice(0, 45)}{selectedText.length > 45 ? '...' : ''}"
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => addChunkToSelection()}
+                    className="text-stone-800 hover:text-black font-mono text-[11px] font-semibold px-2 py-0.5 bg-stone-200 hover:bg-stone-300 rounded cursor-pointer whitespace-nowrap ml-1 transition-colors"
+                  >
+                    + Pin Chunk
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        <form onSubmit={handleRefineSubmit} className="flex gap-2 w-full">
+        <form onSubmit={handleRefineSubmit} className="flex gap-2.5 w-full items-center">
           <input
             type="text"
             placeholder={
-              selectedText
-                ? "Ask AI to rewrite, expand, or simplify the selected text..."
-                : "Ask AI to expand details, simplify section, or add code snippet..."
+              selectedChunks.length > 0
+                ? `Specify edits for the ${selectedChunks.length} selected chunks (e.g., format as comparison table, rewrite concisely)...`
+                : selectedText
+                ? "Describe edit (e.g., expand details, format code, fix equation)..."
+                : "Ask to refine notes (e.g., expand section 2, add code example, simplify math)..."
             }
             value={aiPrompt}
             onChange={(e) => setAiPrompt(e.target.value)}
-            className="flex-1 px-3 py-2 text-sm bg-stone-50 border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="flex-1 px-3.5 py-2.5 text-sm bg-white border border-stone-300 rounded-lg text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all shadow-2xs font-sans"
           />
-          <Button type="submit" variant="secondary" isLoading={isAiRefining}>
-            {selectedText ? 'Refine Selection' : 'Refine Notes'}
+          <Button type="submit" variant="secondary" size="md" isLoading={isAiRefining} className="px-5 font-semibold">
+            {selectedChunks.length > 0
+              ? `Refine Selection (${selectedChunks.length})`
+              : selectedText
+              ? 'Refine Selection'
+              : 'Refine Notes'}
           </Button>
         </form>
       </div>
 
-      {/* Floating Notion-Style Selection Toolbar */}
+      {/* Floating Selection Toolbar - Wide & Minimalist */}
       {selectionRect && selectedText && !isEditing && (
         <div
           ref={floatingBarRef}
@@ -705,41 +776,62 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             transform: 'translateX(-50%)',
             zIndex: 50,
           }}
-          className="ai-refine-interactive bg-stone-900/95 backdrop-blur text-white shadow-2xl border border-stone-700 rounded-xl p-2 flex items-center gap-2"
+          className="ai-refine-interactive bg-stone-950 text-stone-100 shadow-2xl border border-stone-800 rounded-xl px-2 py-1.5 flex items-center gap-2 w-[580px] max-w-[94vw] ring-1 ring-white/10 backdrop-blur-md"
         >
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-mono font-bold uppercase whitespace-nowrap">
-            ✨ Selected ({selectedText.split(/\s+/).filter(Boolean).length}w)
+          {/* Word Count Tag */}
+          <div className="flex items-center px-2 py-1 rounded bg-stone-900 text-stone-300 text-[11px] font-mono whitespace-nowrap border border-stone-800">
+            {selectedText.split(/\s+/).filter(Boolean).length} words
           </div>
+
+          {/* Pin Chunk Action */}
+          <button
+            type="button"
+            onClick={() => addChunkToSelection()}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg bg-stone-900 hover:bg-stone-800 text-stone-200 border border-stone-700/80 transition-colors cursor-pointer whitespace-nowrap"
+            title="Pin this snippet to multi-chunk selection"
+          >
+            <span>+ Pin Chunk</span>
+            {selectedChunks.length > 0 && (
+              <span className="bg-amber-600 text-white text-[10px] font-mono font-bold px-1.5 rounded-full">
+                {selectedChunks.length + 1}
+              </span>
+            )}
+          </button>
+
+          {/* Prompt Form */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              executeRefine(floatingPrompt, selectedText);
+              const targets = selectedChunks.length > 0 ? [...selectedChunks, selectedText] : selectedText;
+              executeRefine(floatingPrompt, targets);
             }}
-            className="flex items-center gap-1.5"
+            className="flex items-center gap-1.5 flex-1 min-w-0"
           >
             <input
               type="text"
               value={floatingPrompt}
               onChange={(e) => setFloatingPrompt(e.target.value)}
-              placeholder="e.g. Rewrite as bullet points, add formula..."
-              className="px-2.5 py-1 text-xs bg-stone-800 border border-stone-700 rounded-lg text-white placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-amber-400 w-60 sm:w-72 font-sans"
+              placeholder="Refinement instruction (e.g. rewrite as table, add code)..."
+              className="flex-1 min-w-0 px-3 py-1.5 text-xs bg-stone-900/90 border border-stone-800 rounded-lg text-stone-100 placeholder-stone-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all font-sans"
               autoFocus
             />
             <button
               type="submit"
               disabled={isAiRefining}
-              className="px-3 py-1 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50 flex-shrink-0"
             >
               {isAiRefining ? 'Refining...' : 'Refine'}
             </button>
           </form>
+
+          {/* Dismiss Button */}
           <button
             type="button"
             onClick={() => {
               setSelectedText('');
               setSelectionRect(null);
             }}
-            className="text-stone-400 hover:text-white p-1 text-xs rounded hover:bg-stone-800 cursor-pointer"
+            className="text-stone-400 hover:text-white p-1 text-xs rounded hover:bg-stone-800 cursor-pointer flex-shrink-0"
             title="Dismiss selection"
           >
             ✕

@@ -204,7 +204,11 @@ export const notesApi = {
     }
   },
 
-  refineNotes: async (htmlContent: string, instruction: string, selection?: string): Promise<{ html: string }> => {
+  refineNotes: async (
+    htmlContent: string,
+    instruction: string,
+    selection?: string | string[]
+  ): Promise<{ html: string }> => {
     try {
       const response = await apiClient.post<{ success: boolean; data: { html: string } }>('/api/notes/edit', {
         html: htmlContent,
