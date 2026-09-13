@@ -5,18 +5,12 @@ import { ExpressError } from "../utils/expressError.js";
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "./yt.transcript.js";
 
-const FAST_LOW_COST_MODELS = [
+export const SUPPORTED_MODELS = [
   GeminiModel || "gemini-3.6-flash",
   "gemini-3.6-flash",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
-
-const SYNTHESIS_MODELS = [
-  GeminiModel || "gemini-3.6-flash",
-  "gemini-3.6-flash",
-  "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-flash-latest",
 ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
 function getGenAI(): GoogleGenAI {
@@ -29,7 +23,7 @@ function getGenAI(): GoogleGenAI {
 export async function executeWithModelFallback<T>(
   actionName: string,
   fn: (ai: GoogleGenAI, modelName: string) => Promise<T | null | undefined>,
-  candidates: string[] = SYNTHESIS_MODELS
+  candidates: string[] = SUPPORTED_MODELS
 ): Promise<T> {
   const ai = getGenAI();
   let lastError: any = null;
@@ -50,8 +44,6 @@ export async function executeWithModelFallback<T>(
     lastError
   );
 }
-
-export { FAST_LOW_COST_MODELS };
 
 export async function generateNotes(
   videoId: string,

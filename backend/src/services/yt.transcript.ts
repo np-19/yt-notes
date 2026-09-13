@@ -1,4 +1,4 @@
-import { executeWithModelFallback, FAST_LOW_COST_MODELS } from "./gemini.service.js";
+import { executeWithModelFallback, SUPPORTED_MODELS } from "./gemini.service.js";
 import { buildTranscriptPrompt } from "../configs/prompts.js";
 
 export type TranscriptEntry = {
@@ -89,6 +89,6 @@ export async function getVideoDetailsAndTranscript(videoId: string): Promise<Vid
         hasSubtitles: data?.hasSubtitles ?? transcript.length > 0,
       };
     },
-    FAST_LOW_COST_MODELS
+    SUPPORTED_MODELS
   );
 }
