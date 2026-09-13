@@ -267,7 +267,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             if (mermaidNodes.length > 0) {
               mermaid.initialize({
                 startOnLoad: false,
-                theme: 'base',
+                theme: 'neutral',
                 securityLevel: 'loose',
                 suppressErrorRendering: true,
                 flowchart: {
@@ -281,17 +281,28 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                 themeVariables: {
                   fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
                   fontSize: '13px',
-                  primaryColor: selectedTheme.bg,
-                  primaryBorderColor: selectedTheme.secondary,
-                  primaryTextColor: selectedTheme.primary,
-                  lineColor: selectedTheme.accent,
-                  secondaryColor: '#eff6ff',
-                  secondaryBorderColor: '#3b82f6',
-                  secondaryTextColor: '#1e3a8a',
-                  tertiaryColor: '#fafaf9',
-                  tertiaryBorderColor: '#e7e5e4',
-                  tertiaryTextColor: '#44403c',
+                  // Cohesive, unified slate & theme palette (no rainbow borders)
+                  primaryColor: '#f8fafc',
+                  primaryBorderColor: '#cbd5e1',
+                  primaryTextColor: '#0f172a',
+                  lineColor: selectedTheme.accent || '#64748b',
+                  secondaryColor: '#f8fafc',
+                  secondaryBorderColor: '#cbd5e1',
+                  secondaryTextColor: '#0f172a',
+                  tertiaryColor: '#f8fafc',
+                  tertiaryBorderColor: '#cbd5e1',
+                  tertiaryTextColor: '#334155',
+                  clusterBkg: '#f8fafc',
+                  clusterBorder: '#cbd5e1',
+                  nodeBorder: '#cbd5e1',
+                  mainBkg: '#ffffff',
+                  nodeTextColor: '#0f172a',
                   edgeLabelBackground: '#ffffff',
+                  actorBorder: '#cbd5e1',
+                  actorBkg: '#f8fafc',
+                  actorTextColor: '#0f172a',
+                  signalColor: selectedTheme.accent || '#64748b',
+                  signalTextColor: '#0f172a',
                 },
               });
 
