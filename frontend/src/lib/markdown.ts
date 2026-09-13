@@ -89,9 +89,10 @@ export function parseMarkdownToHtml(content: string): string {
     ADD_TAGS: [
       "article", "section", "header", "main", "table", "thead", "tbody", "tr", "th", "td",
       "div", "span", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong",
-      "b", "em", "i", "blockquote", "code", "pre", "a", "br", "hr"
+      "b", "em", "i", "blockquote", "code", "pre", "a", "br", "hr",
+      "svg", "g", "path", "rect", "circle", "text", "line", "polygon", "polyline", "marker", "foreignObject"
     ],
-    ADD_ATTR: ["class", "id", "target", "rel", "href"],
+    ADD_ATTR: ["class", "id", "target", "rel", "href", "viewBox", "width", "height", "d", "fill", "stroke", "stroke-width", "transform", "style", "marker-end", "marker-start"],
   });
 }
 

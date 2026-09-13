@@ -131,104 +131,125 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       }
 
       // 4. Render Mermaid Flowcharts safely with dynamic theme palette support
-      try {
-        const mermaidNodes = containerRef.current.querySelectorAll('.mermaid, pre code.language-mermaid, pre.language-mermaid');
-        if (mermaidNodes.length > 0) {
-          mermaid.initialize({
-            startOnLoad: false,
-            theme: 'base',
-            securityLevel: 'loose',
-            suppressErrorRendering: true,
-            flowchart: {
-              curve: 'basis',
-              padding: 16,
-              nodeSpacing: 50,
-              rankSpacing: 45,
-              htmlLabels: true,
-              useMaxWidth: true,
-            },
-            themeVariables: {
-              fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-              fontSize: '13px',
-              primaryColor: selectedTheme.bg,
-              primaryBorderColor: selectedTheme.secondary,
-              primaryTextColor: selectedTheme.primary,
-              lineColor: selectedTheme.accent,
-              secondaryColor: '#eff6ff',
-              secondaryBorderColor: '#3b82f6',
-              secondaryTextColor: '#1e3a8a',
-              tertiaryColor: '#fafaf9',
-              tertiaryBorderColor: '#e7e5e4',
-              tertiaryTextColor: '#44403c',
-              edgeLabelBackground: '#ffffff',
-            },
-          });
-
-          mermaidNodes.forEach(async (node, index) => {
-            try {
-              if (node.getAttribute('data-processed') === 'true') return;
-              const rawText = node.textContent?.trim() || '';
-              if (!rawText) return;
-
-              let targetContainer = node as HTMLElement;
-              if (node.tagName === 'CODE' && node.parentElement?.tagName === 'PRE') {
-                const div = document.createElement('div');
-                div.className = 'mermaid';
-                node.parentElement.replaceWith(div);
-                targetContainer = div;
-              } else if (node.tagName === 'PRE') {
-                const div = document.createElement('div');
-                div.className = 'mermaid';
-                node.replaceWith(div);
-                targetContainer = div;
-              }
-
-              let cleanDiagram = rawText.replace(/^```mermaid\s*/i, '').replace(/```$/i, '').trim();
-              if (
-                !cleanDiagram.startsWith('graph') &&
-                !cleanDiagram.startsWith('flowchart') &&
-                !cleanDiagram.startsWith('sequenceDiagram') &&
-                !cleanDiagram.startsWith('classDiagram') &&
-                !cleanDiagram.startsWith('stateDiagram')
-              ) {
-                cleanDiagram = `graph TD\n${cleanDiagram}`;
-              }
-
-              // Auto-repair unquoted node labels like B[Text (with parens & symbols)] -> B["Text (with parens & symbols)"]
-              cleanDiagram = cleanDiagram.replace(/([\w-]+)\[([^"\]\n]+)\]/g, (_, id, label) => {
-                return `${id}["${label.replace(/"/g, "'")}"]`;
+      if (!isStreaming) {
+        const renderMermaidDiagrams = async () => {
+          try {
+            if (!containerRef.current) return;
+            const mermaidNodes = Array.from(
+              containerRef.current.querySelectorAll('.mermaid, pre code.language-mermaid, pre.language-mermaid')
+            );
+            if (mermaidNodes.length > 0) {
+              mermaid.initialize({
+                startOnLoad: false,
+                theme: 'base',
+                securityLevel: 'loose',
+                suppressErrorRendering: true,
+                flowchart: {
+                  curve: 'basis',
+                  padding: 16,
+                  nodeSpacing: 50,
+                  rankSpacing: 45,
+                  htmlLabels: true,
+                  useMaxWidth: true,
+                },
+                themeVariables: {
+                  fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
+                  fontSize: '13px',
+                  primaryColor: selectedTheme.bg,
+                  primaryBorderColor: selectedTheme.secondary,
+                  primaryTextColor: selectedTheme.primary,
+                  lineColor: selectedTheme.accent,
+                  secondaryColor: '#eff6ff',
+                  secondaryBorderColor: '#3b82f6',
+                  secondaryTextColor: '#1e3a8a',
+                  tertiaryColor: '#fafaf9',
+                  tertiaryBorderColor: '#e7e5e4',
+                  tertiaryTextColor: '#44403c',
+                  edgeLabelBackground: '#ffffff',
+                },
               });
 
-              const id = `mermaid-svg-${Date.now()}-${index}`;
-              const { svg } = await mermaid.render(id, cleanDiagram);
-              targetContainer.innerHTML = svg;
-              targetContainer.setAttribute('data-processed', 'true');
+              // Process sequentially using a for loop to avoid concurrent rendering collisions in Mermaid's singleton parser
+              for (let i = 0; i < mermaidNodes.length; i++) {
+                const node = mermaidNodes[i];
+                if (!containerRef.current || !containerRef.current.contains(node)) continue;
+                if (node.getAttribute('data-processed') === 'true') continue;
 
-              // Force direct inline centering on the container and rendered SVG
-              targetContainer.style.display = 'flex';
-              targetContainer.style.justifyContent = 'center';
-              targetContainer.style.alignItems = 'center';
-              targetContainer.style.margin = '24px auto';
-              targetContainer.style.width = '100%';
-              targetContainer.style.textAlign = 'center';
+                const rawText = node.textContent?.trim() || '';
+                if (!rawText) continue;
 
-              const svgEl = targetContainer.querySelector('svg');
-              if (svgEl) {
-                svgEl.style.display = 'block';
-                svgEl.style.marginLeft = 'auto';
-                svgEl.style.marginRight = 'auto';
-                svgEl.style.maxWidth = '100%';
-                svgEl.style.maxHeight = '420px';
-                svgEl.style.width = 'auto';
+                let targetContainer = node as HTMLElement;
+                if (node.tagName === 'CODE' && node.parentElement?.tagName === 'PRE') {
+                  const div = document.createElement('div');
+                  div.className = 'mermaid';
+                  node.parentElement.replaceWith(div);
+                  targetContainer = div;
+                } else if (node.tagName === 'PRE') {
+                  const div = document.createElement('div');
+                  div.className = 'mermaid';
+                  node.replaceWith(div);
+                  targetContainer = div;
+                }
+
+                let cleanDiagram = rawText.replace(/^```mermaid\s*/i, '').replace(/```$/i, '').trim();
+                if (
+                  !cleanDiagram.startsWith('graph') &&
+                  !cleanDiagram.startsWith('flowchart') &&
+                  !cleanDiagram.startsWith('sequenceDiagram') &&
+                  !cleanDiagram.startsWith('classDiagram') &&
+                  !cleanDiagram.startsWith('stateDiagram') &&
+                  !cleanDiagram.startsWith('erDiagram') &&
+                  !cleanDiagram.startsWith('gantt') &&
+                  !cleanDiagram.startsWith('pie')
+                ) {
+                  cleanDiagram = `graph TD\n${cleanDiagram}`;
+                }
+
+                // Auto-repair unquoted node labels like B[Text (with parens & symbols)] -> B["Text (with parens & symbols)"]
+                cleanDiagram = cleanDiagram.replace(/([\w-]+)\[([^"\]\n]+)\]/g, (_, id, label) => {
+                  return `${id}["${label.replace(/"/g, "'")}"]`;
+                });
+
+                const renderId = `mermaid-svg-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`;
+                try {
+                  const { svg } = await mermaid.render(renderId, cleanDiagram);
+                  if (targetContainer && document.body.contains(targetContainer)) {
+                    targetContainer.innerHTML = svg;
+                    targetContainer.setAttribute('data-processed', 'true');
+
+                    // Force direct inline centering on the container and rendered SVG
+                    targetContainer.style.display = 'flex';
+                    targetContainer.style.justifyContent = 'center';
+                    targetContainer.style.alignItems = 'center';
+                    targetContainer.style.margin = '24px auto';
+                    targetContainer.style.width = '100%';
+                    targetContainer.style.textAlign = 'center';
+
+                    const svgEl = targetContainer.querySelector('svg');
+                    if (svgEl) {
+                      svgEl.style.display = 'block';
+                      svgEl.style.marginLeft = 'auto';
+                      svgEl.style.marginRight = 'auto';
+                      svgEl.style.maxWidth = '100%';
+                      svgEl.style.maxHeight = '420px';
+                      svgEl.style.width = 'auto';
+                    }
+                  }
+                } catch (diagramErr) {
+                  console.warn('Skipping unparseable Mermaid diagram (will retry if updated):', diagramErr);
+                  // Do NOT mark data-processed="true" so updates or complete inputs can render
+                  // Clean up any lingering error element created by Mermaid in document
+                  const errEls = document.querySelectorAll(`[id^="d${renderId}"], [id^="${renderId}"]`);
+                  errEls.forEach((el) => el.remove());
+                }
               }
-            } catch (diagramErr) {
-              console.warn('Skipping unparseable Mermaid diagram:', diagramErr);
-              node.setAttribute('data-processed', 'true');
             }
-          });
-        }
-      } catch (e) {
-        console.warn('Mermaid initialization error:', e);
+          } catch (e) {
+            console.warn('Mermaid initialization error:', e);
+          }
+        };
+
+        renderMermaidDiagrams();
       }
 
       // 5. Force center on all mermaid SVGs & flow diagrams
@@ -260,7 +281,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         });
       } catch (e) {}
     }
-  }, [renderedHtml, activeTab, isEditing, activeThemeId]);
+  }, [renderedHtml, activeTab, isEditing, activeThemeId, isStreaming]);
 
   const handlePrintPdf = () => {
     const isInsideSidePanel = window.self !== window.top || window.location.hash.includes('sidepanel');

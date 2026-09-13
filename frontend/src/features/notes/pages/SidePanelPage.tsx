@@ -298,6 +298,7 @@ export const SidePanelPage: React.FC = () => {
             <NoteEditor
               note={activeNote}
               activeThemeId={activeThemeId}
+              isStreaming={isStreaming}
               onThemeChange={setTheme}
               onUpdateContent={(html, label) => {
                 updateContent(html, label);

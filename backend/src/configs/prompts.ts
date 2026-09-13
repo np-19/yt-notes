@@ -64,15 +64,34 @@ DETAIL LEVEL: CONCISE SUMMARY / KEY POINTS
   - Break into clear numbered sections matching the video's chapters or topics.
   - Include essential definitions and a concise summary table or takeaway cheat-sheet.`;
   } else if (settings.detailLevel === "deep_dive") {
-    coverSubtitle = "Complete Masterclass & In-Depth Technical Guide";
-    coverBadge = "Exhaustive Deep Dive • Study Guide";
+    coverSubtitle = "Exhaustive Technical Masterclass & Engineering Guide";
+    coverBadge = "Exhaustive Deep Dive • Master Study Guide";
     lengthAndDepthInstruction = `
-DETAIL LEVEL: COMPREHENSIVE / EXHAUSTIVE DEEP DIVE
-- GOAL: Produce an exhaustive, masterclass-level study guide that thoroughly covers everything in the video and enriches it with deeper technical insights.
-- APPROACH & PRIORITIES:
-  - FIRST PRIORITY (Core Foundation): Faithfully and thoroughly document everything taught by the author—on-screen slides, diagrams, code implementations, step-by-step logic, and spoken explanations.
-  - SECONDARY ENHANCEMENT (Expert Extensions): If beneficial, supplement the author's points with relevant underlying mechanics (e.g., runtime behavior, OS/memory interactions, concurrency tradeoffs, industry edge cases, and real-world failure modes) to provide a 360-degree technical understanding.
-  - Structure: Chronological numbered sections and subsections matching all video topics, complete comparative tradeoff tables, Mermaid architecture diagrams, and a comprehensive Summary Cheat-Sheet with Review Questions.`;
+DETAIL LEVEL: EXHAUSTIVE TECHNICAL MASTERCLASS (DEEP DIVE)
+- GOAL: Produce an exhaustive, publication-grade study guide that documents 100% of the video's content and enriches every concept from first principles to production edge cases.
+
+- STRICT REQUIREMENT: COMPLETE & UNTRUNCATED VIDEO COVERAGE
+  - Follow the video chronologically from beginning to end without skipping, summarizing away, or omitting ANY section, demo, code walkthrough, slide, or speaker explanation.
+  - Retain the author's exact nuances, examples, diagrams, and terminology.
+
+- LAYERED 4-TIER TECHNICAL DEPTH (Apply to every major concept/topic):
+  1. First Principles & Motivation: What exact problem does this solve? Why was it designed this way? Why do simpler alternative approaches fail?
+  2. Internal Mechanics & Execution Flow: Step-by-step breakdown of how it works under the hood (memory model, OS/runtime behavior, network I/O, state transitions, asymptotic complexity).
+  3. Failure Modes, Gotchas & Anti-Patterns: Real-world edge cases, race conditions, memory leaks, bottlenecks, and common pitfalls under scale.
+  4. Practical Trade-Offs & Decision Rules: Concrete rules of thumb for when to use vs. when to avoid.
+
+- CODE & WALKTHROUGH RIGOR:
+  - Extract and present full, working code implementations with line-by-line annotations explaining the non-obvious logic.
+  - Where helpful, provide state transition tables or dry-run execution traces.
+
+- ARCHITECTURE & VECTOR DIAGRAMS:
+  - Faithfully recreate on-screen diagrams and generate clean Mermaid vector diagrams for complex multi-step workflows, lifecycles, and component architectures (using \`graph TD\`, \`sequenceDiagram\`, or \`stateDiagram-v2\`).
+
+- RIGOROUS COMPARISON MATRICES:
+  - Include multi-column comparative tables: (| Solution / Approach | Best Used When | Critical Trade-Offs | Complexity / Overhead | Common Pitfalls |).
+
+- ACTIVE RECALL & MASTERY SECTION:
+  - Conclude the study guide with 3 to 5 challenging technical/system-design interview questions based on the video's content, followed by clear, concise model solutions.`;
   } else {
     coverSubtitle = "Complete Lecture Notes & Study Guide";
     coverBadge = "Full Lecture Notes • Study Guide";
