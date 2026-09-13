@@ -111,7 +111,11 @@ export async function generateNotesStream(
   });
 }
 
-export async function editNotes(markdown: string, instruction: string, selection?: string): Promise<string> {
+export async function editNotes(
+  markdown: string,
+  instruction: string,
+  selection?: string | string[]
+): Promise<string> {
   const prompt = buildEditPrompt(markdown, instruction, selection);
 
   return executeWithModelFallback("editNotes", async (ai, modelName) => {

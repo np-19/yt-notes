@@ -122,7 +122,7 @@ router.post("/edit", async (req, res, next) => {
       .object({
         html: z.string().min(1).max(1_000_000),
         instruction: z.string().min(2).max(2_000),
-        selection: z.string().max(100_000).nullable().optional(),
+        selection: z.union([z.string(), z.array(z.string())]).nullable().optional(),
       })
       .parse(req.body);
 

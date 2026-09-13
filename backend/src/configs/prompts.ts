@@ -189,14 +189,21 @@ ${transcriptSection}
 `;
 }
 
-export function buildEditPrompt(markdown: string, instruction: string, selection?: string): string {
-  const selectionBlock =
-    selection && selection.trim().length > 0
-      ? `Selected Text to modify/fix:
-"""
-${selection.trim()}
-"""\n`
-      : "";
+export function buildEditPrompt(markdown: string, instruction: string, selection?: string | string[]): string {
+  let selectionBlock = "";
+  if (Array.isArray(selection) && selection.length > 0) {
+    const valid = selection.map((s) => s.trim()).filter(Boolean);
+    if (valid.length === 1) {
+      selectionBlock = `Selected Text to modify/fix:\n"""\n${valid[0]}\n"""\n\n`;
+    } else if (valid.length > 1) {
+      selectionBlock =
+        `Selected Multiple Chunks (${valid.length} target sections to modify/fix):\n` +
+        valid.map((chunk, idx) => `[Target Chunk ${idx + 1}]:\n"""\n${chunk}\n"""`).join("\n\n") +
+        "\n\n";
+    }
+  } else if (typeof selection === "string" && selection.trim().length > 0) {
+    selectionBlock = `Selected Text to modify/fix:\n"""\n${selection.trim()}\n"""\n\n`;
+  }
 
   return `You are an expert technical note editor and markdown formatter.
 Instruction: "${instruction}"
@@ -207,7 +214,7 @@ ${markdown}
 """
 
 Editing & Formatting Rules:
-1. Apply the user's instruction precisely to the document (or specifically to the selected section if provided).
+1. Apply the user's instruction precisely to the document (focusing specifically on the specified selected chunk(s) if provided).
 2. FIX FORMATTING & SYNTAX DEFECTS:
    - If the text contains broken LaTeX, raw unescaped LaTeX tags (like \\text{...}), or red error formulas:
      - If it contains SQL, database queries, code, or API endpoints (e.g. \`SELECT ...\`, \`WHERE id = ...\`), CONVERT it to clean inline code (\`...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`). NEVER leave SQL or code inside LaTeX math blocks.
