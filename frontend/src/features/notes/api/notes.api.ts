@@ -14,7 +14,7 @@ export function extractYouTubeId(url: string): string | null {
 // Read transcript from chrome.storage (populated by extension content.js when user is on a YouTube page)
 export const fetchBrowserTranscript = async (
   videoId: string
-): Promise<Array<{ text: string; offset: number; duration: number; lang: string }> | undefined> => {
+): Promise<Array<{ text: string; offset: number }> | undefined> => {
   try {
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       return new Promise((resolve) => {

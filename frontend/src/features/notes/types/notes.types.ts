@@ -42,7 +42,7 @@ export interface GenerateNotesParams {
   customPrompt?: string;
   customTopic?: string;
   settings?: NoteSettings;
-  transcript?: Array<{ text: string; offset?: number; duration?: number; lang?: string }>;
+  transcript?: Array<{ text: string; offset?: number }>;
 }
 
 export interface NotesState {

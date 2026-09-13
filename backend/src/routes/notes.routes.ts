@@ -17,9 +17,7 @@ const settings = z.object({
 
 const transcriptEntrySchema = z.object({
   text: z.string(),
-  duration: z.number().optional().default(0),
   offset: z.number().optional().default(0),
-  lang: z.string().optional().default("en"),
 });
 
 const notePayloadSchema = settings.extend({

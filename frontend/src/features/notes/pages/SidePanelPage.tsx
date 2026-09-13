@@ -45,7 +45,7 @@ export const SidePanelPage: React.FC = () => {
     window.parent.postMessage({ type: 'CLOSE_LECTURE_PANEL' }, '*');
   };
 
-  const resolveTranscript = async (vId: string): Promise<Array<{ text: string; offset?: number; duration?: number; lang?: string }> | undefined> => {
+  const resolveTranscript = async (vId: string): Promise<Array<{ text: string; offset?: number }> | undefined> => {
     if (!vId) return undefined;
     if (typeof chrome !== 'undefined' && chrome.storage?.local) {
       try {
