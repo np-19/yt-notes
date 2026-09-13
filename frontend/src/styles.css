@@ -221,7 +221,7 @@ body { margin: 0; }
   transition: background 0.15s;
 }
 .url-form button:hover { background: #1e2420; }
-input {
+:where(input:not([class])) {
   display: block;
   margin-top: 7px;
   width: 100%;
@@ -232,7 +232,7 @@ input {
   color: #292e2b;
   font: 12px 'DM Mono', monospace;
 }
-input:focus, select:focus {
+:where(input:not([class])):focus, :where(select:not([class])):focus {
   outline: none;
   border-color: #e85d3f;
 }
