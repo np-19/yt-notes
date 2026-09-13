@@ -1,7 +1,6 @@
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "../services/yt.transcript.js";
 
-// ─── Transcript Extraction Prompt ───────────────────────────────────────────
 
 export function buildTranscriptPrompt(videoId: string): string {
   return `You are a YouTube video transcription and metadata extraction engine.
@@ -29,7 +28,6 @@ Output STRICTLY as raw JSON, no markdown fences:
 }`;
 }
 
-// ─── Notes Generation Prompt ────────────────────────────────────────────────
 
 export function buildNotesPrompt(
   videoId: string,
