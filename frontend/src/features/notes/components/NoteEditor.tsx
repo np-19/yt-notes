@@ -54,8 +54,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     if (text && !selectedChunks.includes(text)) {
       setSelectedChunks((prev) => [...prev, text]);
     }
+    // Clear active browser selection range but keep the floating bar open with the updated pinned badge
     setSelectedText('');
-    setSelectionRect(null);
     window.getSelection()?.removeAllRanges();
   };
 
@@ -69,6 +69,108 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     setSelectionRect(null);
     window.getSelection()?.removeAllRanges();
   };
+
+  // Dynamically Highlight Pinned Chunks in the Main Note Preview
+  useEffect(() => {
+    if (!containerRef.current || isStreaming) return;
+
+    const container = containerRef.current;
+
+    // 1. Remove any existing pinned highlight marks
+    const existingMarks = container.querySelectorAll('mark.pinned-note-highlight');
+    existingMarks.forEach((mark) => {
+      const parent = mark.parentNode;
+      if (parent) {
+        while (mark.firstChild) {
+          parent.insertBefore(mark.firstChild, mark);
+        }
+        parent.removeChild(mark);
+      }
+    });
+    container.normalize();
+
+    if (selectedChunks.length === 0) return;
+
+    // 2. Wrap text node matches for each pinned chunk
+    selectedChunks.forEach((chunk) => {
+      const fullText = chunk.trim();
+      if (!fullText || fullText.length < 2) return;
+
+      // Match multi-line or long selections by segments
+      const segments = fullText.split(/\n+/).map((s) => s.trim()).filter((s) => s.length >= 2);
+      const targets = segments.length > 0 ? segments : [fullText];
+
+      targets.forEach((targetText) => {
+        const walker = document.createTreeWalker(
+          container,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode: (node) => {
+              const parent = node.parentElement;
+              if (!parent) return NodeFilter.FILTER_REJECT;
+              if (
+                parent.closest('mark.pinned-note-highlight') ||
+                parent.closest('.katex') ||
+                parent.closest('.mermaid') ||
+                parent.closest('script') ||
+                parent.closest('style') ||
+                parent.closest('.ai-refine-interactive')
+              ) {
+                return NodeFilter.FILTER_REJECT;
+              }
+              return NodeFilter.FILTER_ACCEPT;
+            },
+          }
+        );
+
+        const replacements: { node: Text; idx: number; len: number }[] = [];
+        let currentNode: Text | null;
+
+        while ((currentNode = walker.nextNode() as Text | null)) {
+          const textVal = currentNode.nodeValue || '';
+          const idx = textVal.indexOf(targetText);
+          if (idx !== -1) {
+            replacements.push({ node: currentNode, idx, len: targetText.length });
+          }
+        }
+
+        replacements.forEach(({ node, idx, len }) => {
+          try {
+            const textVal = node.nodeValue || '';
+            const before = textVal.substring(0, idx);
+            const match = textVal.substring(idx, idx + len);
+            const after = textVal.substring(idx + len);
+
+            const mark = document.createElement('mark');
+            mark.className = 'pinned-note-highlight';
+            mark.style.backgroundColor = 'rgba(249, 115, 22, 0.25)';
+            mark.style.borderBottom = '2px solid #f97316';
+            mark.style.borderRadius = '3px';
+            mark.style.padding = '1px 3px';
+            mark.style.color = 'inherit';
+            mark.style.fontWeight = 'inherit';
+            mark.textContent = match;
+
+            const parent = node.parentNode;
+            if (!parent) return;
+
+            if (before) {
+              parent.insertBefore(document.createTextNode(before), node);
+            }
+            parent.insertBefore(mark, node);
+            if (after) {
+              parent.insertBefore(document.createTextNode(after), node);
+            }
+            parent.removeChild(node);
+          } catch (err) {
+            console.warn('Failed to highlight text node:', err);
+          }
+        });
+
+        container.normalize();
+      });
+    });
+  }, [selectedChunks, editableHtml, isStreaming]);
 
   // Handle Mouse Text Selection
   useEffect(() => {
@@ -97,7 +199,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
         // Only clear active highlighted text if not clicking inside refinement UI
         if (!(e.target as HTMLElement)?.closest('.ai-refine-interactive')) {
           setSelectedText('');
-          setSelectionRect(null);
+          if (selectedChunks.length === 0) {
+            setSelectionRect(null);
+          }
         }
       }
     };
@@ -106,7 +210,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
     return () => {
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, []);
+  }, [selectedChunks.length]);
 
   const renderedHtml = parseMarkdownToHtml(editableHtml);
   const headings = extractMarkdownHeadings(editableHtml);
@@ -766,7 +870,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
       </div>
 
       {/* Floating Selection Toolbar - Rounded-Full Minimalist Pill Design */}
-      {selectionRect && selectedText && !isEditing && (
+      {selectionRect && (selectedText || selectedChunks.length > 0) && !isEditing && (
         <div
           ref={floatingBarRef}
           style={{
@@ -777,39 +881,64 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             zIndex: 50,
             backgroundColor: '#1e1e20',
           }}
-          className="ai-refine-interactive text-white shadow-2xl border border-neutral-700/60 rounded-full pl-3.5 pr-2 py-1.5 flex items-center gap-2.5 w-[560px] max-w-[94vw] ring-1 ring-black/60 backdrop-blur-lg h-11"
+          className="ai-refine-interactive text-white shadow-2xl border border-neutral-700/60 rounded-full pl-3.5 pr-2 py-1.5 flex items-center gap-2.5 w-[580px] max-w-[95vw] ring-1 ring-black/60 backdrop-blur-lg h-11"
         >
-          {/* Word Count */}
-          <span className="text-neutral-400 text-xs font-mono select-none flex-shrink-0 leading-none">
-            {selectedText.split(/\s+/).filter(Boolean).length}w
-          </span>
+          {/* Word Count / Pinned Badge */}
+          {selectedText ? (
+            <span className="text-neutral-400 text-xs font-mono select-none flex-shrink-0 leading-none">
+              {selectedText.split(/\s+/).filter(Boolean).length}w
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-orange-400 text-xs font-mono font-semibold select-none flex-shrink-0 leading-none">
+              <svg className="w-3.5 h-3.5 text-orange-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              {selectedChunks.length} pinned
+            </span>
+          )}
 
           {/* Vertical Divider */}
           <div className="h-4 w-[1px] bg-neutral-700/70 flex-shrink-0" />
 
-          {/* Pin Chunk Action */}
-          <button
-            type="button"
-            onClick={() => addChunkToSelection()}
-            className="flex items-center gap-1.5 text-neutral-300 hover:text-white text-xs font-medium px-2 py-1 rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer flex-shrink-0 leading-none"
-            title="Pin snippet for multi-chunk refinement"
-          >
-            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-            </svg>
-            <span>Pin</span>
-            {selectedChunks.length > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full leading-tight">
-                {selectedChunks.length}
-              </span>
-            )}
-          </button>
+          {/* Pin Chunk Action (when selecting text) or Clear (when viewing pinned state) */}
+          {selectedText ? (
+            <button
+              type="button"
+              onClick={() => addChunkToSelection()}
+              className="flex items-center gap-1.5 text-neutral-300 hover:text-white text-xs font-medium px-2 py-1 rounded-full hover:bg-neutral-800/80 transition-colors cursor-pointer flex-shrink-0 leading-none"
+              title="Pin snippet for multi-chunk refinement"
+            >
+              <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+              </svg>
+              <span>Pin</span>
+              {selectedChunks.length > 0 && (
+                <span className="bg-[#f95721] text-white text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full leading-tight">
+                  {selectedChunks.length}
+                </span>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={clearAllChunks}
+              className="text-neutral-400 hover:text-white text-xs font-mono underline px-1.5 py-0.5 rounded cursor-pointer flex-shrink-0 leading-none"
+              title="Clear all pinned chunks"
+            >
+              Clear
+            </button>
+          )}
 
           {/* Prompt Form */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const targets = selectedChunks.length > 0 ? [...selectedChunks, selectedText] : selectedText;
+              const targets =
+                selectedChunks.length > 0
+                  ? selectedText && !selectedChunks.includes(selectedText)
+                    ? [...selectedChunks, selectedText]
+                    : selectedChunks
+                  : selectedText;
               executeRefine(floatingPrompt, targets);
             }}
             style={{ margin: 0, padding: 0 }}
@@ -819,7 +948,13 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               type="text"
               value={floatingPrompt}
               onChange={(e) => setFloatingPrompt(e.target.value)}
-              placeholder="Refine selection..."
+              placeholder={
+                selectedChunks.length > 0
+                  ? selectedText
+                    ? `Refine ${selectedChunks.length + 1} chunks...`
+                    : `Refine ${selectedChunks.length} pinned ${selectedChunks.length === 1 ? 'chunk' : 'chunks'}...`
+                  : "Refine selection..."
+              }
               style={{
                 backgroundColor: 'rgba(0, 0, 0, 0.35)',
                 color: '#ffffff',

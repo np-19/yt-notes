@@ -122,6 +122,16 @@ export async function editNotes(
     const result = await ai.models.generateContent({
       model: modelName,
       contents: prompt,
+      config: {
+        systemInstruction: `You are an expert technical note editor and markdown formatting repair specialist.
+Your primary mandate is to output 100% syntactically valid Markdown, flawless KaTeX mathematics, and error-free Mermaid diagrams while strictly executing the user's edits.
+- Only use LaTeX ($...$ or $$...$$) for true mathematical and Big-O notation.
+- NEVER leave SQL queries, code, or API paths in LaTeX math delimiters.
+- Double-quote every Mermaid node label containing parentheses, colons, or punctuation.
+- Ensure all tables have valid header rows and code fences have language tags.
+- Return the full updated document text only with no conversational wrapper.`,
+        temperature: 0.15,
+      },
     });
     let text = (result.text || "").trim();
     if (text.startsWith("```markdown")) {

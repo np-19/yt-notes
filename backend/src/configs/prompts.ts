@@ -194,33 +194,57 @@ export function buildEditPrompt(markdown: string, instruction: string, selection
   if (Array.isArray(selection) && selection.length > 0) {
     const valid = selection.map((s) => s.trim()).filter(Boolean);
     if (valid.length === 1) {
-      selectionBlock = `Selected Text to modify/fix:\n"""\n${valid[0]}\n"""\n\n`;
+      selectionBlock = `TARGET SECTION TO MODIFY/FIX:\n"""\n${valid[0]}\n"""\n\n`;
     } else if (valid.length > 1) {
       selectionBlock =
-        `Selected Multiple Chunks (${valid.length} target sections to modify/fix):\n` +
+        `TARGET MULTIPLE CHUNKS (${valid.length} target sections to modify/fix):\n` +
         valid.map((chunk, idx) => `[Target Chunk ${idx + 1}]:\n"""\n${chunk}\n"""`).join("\n\n") +
         "\n\n";
     }
   } else if (typeof selection === "string" && selection.trim().length > 0) {
-    selectionBlock = `Selected Text to modify/fix:\n"""\n${selection.trim()}\n"""\n\n`;
+    selectionBlock = `TARGET SECTION TO MODIFY/FIX:\n"""\n${selection.trim()}\n"""\n\n`;
   }
 
-  return `You are an expert technical note editor and markdown formatter.
-Instruction: "${instruction}"
+  return `You are an expert technical note editor and markdown formatting repair specialist.
 
-${selectionBlock}Full Document Context:
+USER INSTRUCTION:
+"${instruction}"
+
+${selectionBlock}DOCUMENT TO EDIT / REPAIR:
 """
 ${markdown}
 """
 
-Editing & Formatting Rules:
-1. Apply the user's instruction precisely to the document (focusing specifically on the specified selected chunk(s) if provided).
-2. FIX FORMATTING & SYNTAX DEFECTS:
-   - If the text contains broken LaTeX, raw unescaped LaTeX tags (like \\text{...}), or red error formulas:
-     - If it contains SQL, database queries, code, or API endpoints (e.g. \`SELECT ...\`, \`WHERE id = ...\`), CONVERT it to clean inline code (\`...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`). NEVER leave SQL or code inside LaTeX math blocks.
-     - If it represents mathematical or Big-O complexity formulas, fix the LaTeX syntax (escape underscores as \\_, ensure balanced braces, and wrap with $...$ or $$...$$).
-   - Ensure tables, callouts, lists, and Mermaid diagrams are valid and properly formatted.
-3. Preserve all valid HTML cover headers (<header class="note-cover">...</header>), section structure, and valid Mermaid diagrams unless instructed to edit them.
-4. Return the COMPLETE updated markdown document.
-5. Output clean Markdown only, no meta-commentary, explanations, or top-level wrapping backticks.`;
+STRICT EDITING & FORMATTING REPAIR MANDATES:
+
+1. TARGETED EDITING:
+   - Apply the user's instruction precisely to the document.
+   - If target chunk(s) are specified above, focus the modifications directly on those sections while keeping the rest of the document context intact.
+
+2. MATH & LATEX FORMATTING REPAIRS (Zero Tolerance for Broken Formulas):
+   - ONLY use LaTeX ($...$ or $$...$$) for actual mathematical formulas, arithmetic, calculus, probabilities, and Big-O notation (e.g. $O(N \\log N)$, $T(n) = 2T(n/2) + O(n)$).
+   - ABSOLUTE PROHIBITION: If SQL queries, database commands, code snippets, or API endpoints were mistakenly placed in LaTeX math (e.g., "$SELECT * ...$", "$$\\text{CREATE TABLE ...}$$"), REMOVE the dollar signs and format them as clean inline backticks (\`SELECT * ...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`).
+   - LATEX ESCAPING:
+     - In all LaTeX formulas, escape literal underscores as \\_ (e.g. \$\\text{max\\_size}\$).
+     - In all LaTeX formulas, escape percentage signs as \\% (e.g. \$99.9\\%\$).
+     - Ensure all curly braces { } and math delimiters are balanced.
+     - Never leave stray unescaped single dollar signs in normal text (e.g. write "50 USD" or "\\$50").
+
+3. MERMAID DIAGRAM SYNTAX REPAIRS:
+   - Double-quote EVERY node label that contains spaces, parentheses, brackets, colons, or punctuation:
+     ✓ DO: A["Client (Browser)"] --> B["API Gateway: 8080"]
+     ✗ NEVER: A[Client (Browser)] --> B[API Gateway: 8080]
+   - Use standard valid diagram headers only: \`graph TD\`, \`graph LR\`, \`sequenceDiagram\`, \`stateDiagram-v2\`.
+   - In sequence diagrams, wrap message labels in quotes: \`Client->>Server: "POST /api/v1/data"\`.
+   - Never use reserved keywords (\`end\`, \`node\`, \`graph\`, \`subgraph\`) as node identifiers.
+
+4. MARKDOWN TABLES & CODE BLOCKS:
+   - Ensure all tables have a valid header row with hyphens (|---|---|) and matching column counts across every row.
+   - Escape literal pipe characters inside table cells with \\| or code backticks.
+   - Ensure all code blocks are properly fenced with triple backticks and have the correct language identifier (\`\`\`python, \`\`\`typescript, \`\`\`sql, \`\`\`json, \`\`\`bash, etc.).
+
+5. DOCUMENT INTEGRITY:
+   - Preserve valid <header class="note-cover">...</header> tags and numbered heading structure.
+   - Return the COMPLETE updated markdown document.
+   - Output clean Markdown only — NO conversational introductions, NO trailing commentary, and NO top-level markdown code fences.`;
 }

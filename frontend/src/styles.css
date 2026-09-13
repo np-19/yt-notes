@@ -1171,3 +1171,16 @@ footer {
     page-break-inside: avoid !important;
   }
 }
+
+/* Pinned Note Multi-Chunk Selection Highlights */
+mark.pinned-note-highlight {
+  background-color: rgba(249, 115, 22, 0.25) !important;
+  border-bottom: 2px solid #f97316 !important;
+  border-radius: 4px;
+  padding: 1px 3px;
+  color: inherit !important;
+  font-weight: inherit !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
+}
+

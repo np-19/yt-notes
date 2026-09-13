@@ -18,6 +18,36 @@ export function isHtmlContent(content: string): boolean {
   );
 }
 
+export function healMarkdownDefects(markdown: string): string {
+  if (!markdown) return "";
+  let text = markdown;
+
+  // 1. Auto-repair SQL/Database queries mistakenly enclosed in LaTeX $$ ... $$ or $ ... $
+  text = text.replace(/\$\$\s*(SELECT|INSERT|UPDATE|DELETE|CREATE\s+TABLE|ALTER\s+TABLE|DROP\s+TABLE|WITH\s+[A-Za-z0-9_]+\s+AS)[\s\S]*?\$\$/gi, (match) => {
+    const rawSql = match.replace(/^\$\$\s*/, "").replace(/\s*\$\$$/, "").trim();
+    return `\n\`\`\`sql\n${rawSql}\n\`\`\`\n`;
+  });
+
+  text = text.replace(/\$(SELECT\s+[^$\n]+FROM[^$\n]+)\$/gi, (_match, sql) => {
+    return `\`${sql.trim()}\``;
+  });
+
+  // 2. Escape isolated currency dollar amounts (e.g., "$50" or "$100/mo") to prevent accidental math mode across paragraphs
+  text = text.replace(/(^|\s)\$(\d+(?:\.\d{1,2})?)(?=\s|[.,;!?\/\)]|$)/g, '$1\\$$2');
+
+  // 3. Auto-repair Mermaid diagrams: quote unquoted node labels with parentheses, colons, or slashes
+  text = text.replace(/```mermaid\s*([\s\S]*?)```/gi, (_match, diagramBody) => {
+    const lines = diagramBody.split('\n');
+    const fixedLines = lines.map((line: string) => {
+      // If line is a node declaration with unquoted parens, colons, or slashes: A[Client (React)] -> A["Client (React)"]
+      return line.replace(/([A-Za-z0-9_]+)\[([^"\]\n]+[\(:/][^"\]\n]*)\]/g, '$1["$2"]');
+    });
+    return `\`\`\`mermaid\n${fixedLines.join('\n')}\n\`\`\``;
+  });
+
+  return text;
+}
+
 export function parseMarkdownToHtml(content: string): string {
   if (!content) return "";
 
@@ -38,7 +68,8 @@ export function parseMarkdownToHtml(content: string): string {
     });
   }
 
-  let processedMarkdown = content;
+  // Pre-process and heal common markdown / LaTeX / Mermaid syntax defects
+  let processedMarkdown = healMarkdownDefects(content);
 
   // If the markdown starts with a single top-level heading '# Title' and does not already have a note-cover header,
   // gracefully transform it into a full A4 cover page
