@@ -1,7 +1,6 @@
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "../services/yt.transcript.js";
 
-
 export function buildTranscriptPrompt(videoId: string): string {
   return `You are a YouTube video transcription and metadata extraction engine.
 YouTube Video ID: "${videoId}"
@@ -28,7 +27,6 @@ Output STRICTLY as raw JSON, no markdown fences:
 }`;
 }
 
-
 export function buildNotesPrompt(
   videoId: string,
   transcript: TranscriptEntry[],
@@ -45,7 +43,7 @@ export function buildNotesPrompt(
   const transcriptSection =
     transcript && transcript.length > 0
       ? `Timestamped Transcript:\n${transcript.map((entry) => `[${entry.offset}ms] ${entry.text}`).join("\n")}`
-      : `YouTube Video ID: ${videoId}${lectureTitle ? `\nVideo Title: "${lectureTitle}"` : ""}.\nNote: Ingest and synthesize the definitive, high-depth technical study guide covering this video in full academic rigor with foundational principles, architectures, algorithms, equations, diagrams, and concrete implementation examples.`;
+      : `YouTube Video ID: ${videoId}${lectureTitle ? `\nVideo Title: "${lectureTitle}"` : ""}.\nNote: Ingest and take faithful, structured technical notes covering this video. Capture on-screen slides, diagrams, code, and speaker explanations accurately.`;
 
   const customInstruction = settings.customPrompt?.trim()
     ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`
@@ -56,169 +54,143 @@ export function buildNotesPrompt(
   let coverBadge = "";
 
   if (settings.detailLevel === "quick" || settings.detailLevel === "short") {
-    coverSubtitle = "Executive Summary & Key Takeaways Briefing";
-    coverBadge = "Executive Briefing • Quick Reference";
+    coverSubtitle = "Key Concepts & Executive Summary";
+    coverBadge = "Quick Reference • Summary Notes";
     lengthAndDepthInstruction = `
-CRITICAL LENGTH & DEPTH TARGET: CONCISE SUMMARY / EXECUTIVE BRIEFING (TARGET: 400 - 750 WORDS, 1-2 A4 PAGES MAX)
-- GOAL: Synthesize a rapid, high-impact briefing that gives the reader complete clarity on the core concepts in under 3 minutes.
-- STRUCTURE REQUIREMENTS:
-  - 1. Executive Summary & Core Thesis (1-2 crisp paragraphs summarizing the main problem and central solution)
-  - 2. Key Pillars & Core Takeaways (3-5 bulleted highlights with bold titles explaining essential mechanisms)
-  - 3. Essential Comparison / Architecture Overview (1 concise table OR 1 high-level flowchart)
-  - 4. Actionable Lessons & Summary Cheat-Sheet (Brief bulleted takeaways)
-- STRICT CONSTRAINTS:
-  - DO NOT produce an exhaustive multi-page essay. Be concise, punchy, and dense with high-value insights.
-  - Keep paragraphs short (2-3 sentences max).
-  - Use at most 1 Mermaid diagram or 1 table.
-  - Skip extensive mathematical derivations or long code blocks unless a small 3-line snippet is critical.`;
+DETAIL LEVEL: CONCISE SUMMARY / KEY POINTS
+- GOAL: Provide a high-level, fast-to-read summary capturing all key topics, essential definitions, and main takeaways from the entire video.
+- APPROACH:
+  - Cover every topic presented in the video, keeping explanations crisp, direct, and focused on core principles.
+  - Break into clear numbered sections matching the video's chapters or topics.
+  - Include essential definitions and a concise summary table or takeaway cheat-sheet.`;
   } else if (settings.detailLevel === "deep_dive") {
-    coverSubtitle = "Definitive Technical Whitepaper & Architectural Reference";
-    coverBadge = "Comprehensive Masterclass • In-Depth Whitepaper";
+    coverSubtitle = "Complete Masterclass & In-Depth Technical Guide";
+    coverBadge = "Exhaustive Deep Dive • Study Guide";
     lengthAndDepthInstruction = `
-CRITICAL LENGTH & DEPTH TARGET: COMPREHENSIVE / EXHAUSTIVE DEEP-DIVE (TARGET: 3500 - 5500+ WORDS, MULTI-PAGE EXTENSIVE MASTERCLASS)
-- GOAL: Synthesize an exhaustive, graduate-level technical whitepaper covering every concept, nuance, edge case, and architectural tradeoff mentioned in the lecture.
-- STRUCTURE REQUIREMENTS:
-  - Produce 7 to 10 comprehensive numbered sections (## 1. through ## 8+) systematically covering every topic from the timestamped transcript.
-  - Include thorough step-by-step mathematical proofs/derivations in LaTeX where applicable.
-  - Include multiple detailed Mermaid diagrams (flowcharts, sequence diagrams, state machines, tree hierarchies).
-  - Include concrete code snippets with line comments and step-by-step walkthroughs.
-  - Include detailed comparative tradeoff tables, failure modes, race conditions, edge cases, and memory/concurrency performance considerations.
-  - Conclude with an exhaustive Summary Cheat-Sheet and Review Questions.
-- STRICT CONSTRAINTS:
-  - Maximize depth, rigor, and technical detail. Leave no concept unexamined or glossed over.`;
+DETAIL LEVEL: COMPREHENSIVE / EXHAUSTIVE DEEP DIVE
+- GOAL: Produce an exhaustive, masterclass-level study guide that thoroughly covers everything in the video and enriches it with deeper technical insights.
+- APPROACH & PRIORITIES:
+  - FIRST PRIORITY (Core Foundation): Faithfully and thoroughly document everything taught by the author—on-screen slides, diagrams, code implementations, step-by-step logic, and spoken explanations.
+  - SECONDARY ENHANCEMENT (Expert Extensions): If beneficial, supplement the author's points with relevant underlying mechanics (e.g., runtime behavior, OS/memory interactions, concurrency tradeoffs, industry edge cases, and real-world failure modes) to provide a 360-degree technical understanding.
+  - Structure: Chronological numbered sections and subsections matching all video topics, complete comparative tradeoff tables, Mermaid architecture diagrams, and a comprehensive Summary Cheat-Sheet with Review Questions.`;
   } else {
-    coverSubtitle = "Complete Technical Study Guide & Architecture Whitepaper";
-    coverBadge = "Academic Synthesis • A4 Technical Whitepaper";
+    coverSubtitle = "Complete Lecture Notes & Study Guide";
+    coverBadge = "Full Lecture Notes • Study Guide";
     lengthAndDepthInstruction = `
-CRITICAL LENGTH & DEPTH TARGET: DETAILED / STANDARD STUDY GUIDE (TARGET: 1500 - 2500 WORDS, 3-5 A4 PAGES)
-- GOAL: A well-balanced, high-depth technical study guide balancing theoretical rigor, concrete examples, clear architectures, and practical takeaways.
-- STRUCTURE REQUIREMENTS:
-  - Produce 4 to 6 structured numbered sections (## 1. through ## 5/6) covering all core lecture concepts.
-  - Include 1-2 Mermaid vector diagrams explaining key workflows.
-  - Include worked numerical/conceptual examples, LaTeX formulas for key equations, and code blocks for relevant patterns.
-  - Include 1 comprehensive comparison table and a concluding Summary Cheat-Sheet.`;
+DETAIL LEVEL: STANDARD DETAILED NOTES
+- GOAL: Produce complete, thorough lecture notes capturing everything taught in the video from start to finish without omitting any topic or concept.
+- APPROACH:
+  - Complete Video Coverage: Document every single topic, slide, whiteboard drawing, code snippet, and explanation presented by the speaker in chronological order.
+  - Structure: Numbered sections and subsections corresponding to every topic and concept in the video.
+  - Content: Provide accurate definitions, recreate on-screen diagrams, document all worked examples, and capture all code blocks discussed.
+  - Conclude with a Summary Cheat-Sheet.`;
   }
 
   let diagramInstruction = "";
   if (settings.diagramDensity === "minimal") {
-    diagramInstruction = "- DIAGRAM DENSITY: Minimal (Include 0 or at most 1 essential Mermaid diagram only if absolutely crucial).";
+    diagramInstruction = "- DIAGRAM DENSITY: Minimal. Recreate only the diagrams and visual structures directly drawn or displayed on screen in the video.";
   } else if (settings.diagramDensity === "aggressive") {
-    diagramInstruction = "- DIAGRAM DENSITY: Heavy (Include 3 to 5 rich Mermaid diagrams: system flowcharts, sequence interactions, data structures, and architectural state machines).";
+    diagramInstruction = "- DIAGRAM DENSITY: Heavy. Recreate all on-screen diagrams in detail AND convert all multi-step workflows, lifecycles, and architectures mentioned into Mermaid diagrams (3 to 5 diagrams total).";
   } else {
-    diagramInstruction = "- DIAGRAM DENSITY: Balanced (Include 1 to 2 clear Mermaid diagrams where they provide high explanatory value).";
+    diagramInstruction = "- DIAGRAM DENSITY: Balanced. Recreate on-screen diagrams and include 1 to 2 clear Mermaid vector diagrams where they provide strong visual clarity.";
   }
 
   let examplesInstruction = "";
   if (settings.examples === "minimal") {
-    examplesInstruction = "- EXAMPLES: Concise (Keep examples brief, focus purely on core principles).";
+    examplesInstruction = "- EXAMPLES: Concise. State the rules and concepts directly without long narrative examples.";
   } else if (settings.examples === "many") {
-    examplesInstruction = "- EXAMPLES: Many (Provide multiple worked step-by-step examples, real-world analogies, and concrete parameter walkthroughs).";
+    examplesInstruction = "- EXAMPLES: Many. Capture every real-world example, scenario, code walkthrough, and edge case mentioned by the speaker.";
   } else {
-    examplesInstruction = "- EXAMPLES: Balanced (Include 1-2 worked examples).";
+    examplesInstruction = "- EXAMPLES: Balanced. Capture the primary real-world example and analogy the speaker used to explain each concept.";
   }
 
-  return `Create an educational study guide in clean GitHub-Flavored Markdown (GFM) for a technical lecture, adhering to the design language of a published technical whitepaper.
+  return `You are generating structured, highly readable technical notes from a video lecture.
 
 ${lengthAndDepthInstruction}
 
-CRITICAL FORMATTING & CONTENT RULES:
-- OUTPUT FORMAT: Return clean Markdown only. Do not wrap the entire response in a top-level code block.
-- NO EMOJIS: Never use emojis anywhere. Use minimalistic typographic symbols only: ✓ for yes/positive, ✗ for no/negative, and → for flow arrows.
-- STANDALONE A4 FRONT COVER PAGE: Always begin the document with the exact A4 cover page header format below:
+CRITICAL NOTE-TAKING & ACCURACY RULES:
+
+1. FAITHFUL TO THE VIDEO CONTENT & FLOW:
+   - Capture what was actually taught, written on screen (slides, whiteboard, diagrams, code), and explained by the speaker.
+   - Follow the chronological sequence and topic progression of the video.
+   - Do NOT replace the speaker's practical developer explanations with artificial, overly dense academic jargon. Keep the language natural, clear, and direct.
+
+2. ACCURATE DEFINITIONS & FACT CORRECTION:
+   - Provide standard, technically accurate definitions for all concepts introduced in the video.
+   - FACT CHECKING: If the speaker misstates a fact, makes a technical slip-up, or teaches an outdated/incorrect definition, state the correct standard fact in the notes and add a clear callout:
+     > **Technical Note / Correction:** [Briefly clarify the accurate standard definition or industry best practice]
+
+3. VISUALS & ON-SCREEN DIAGRAMS:
+   ${diagramInstruction}
+   - When diagrams appear on screen (e.g., flowcharts, architecture maps, ER diagrams, sequence flows, class hierarchies), recreate them faithfully using \`\`\`mermaid code blocks.
+   - Use clean, double-quoted node labels like \`A["User Request"]\` and readable layout directions (\`graph TD\` or \`graph LR\`).
+
+4. CODE SNIPPETS & EXAMPLES:
+   ${settings.includeCode ? "- Extract and format code snippets shown on screen using syntax-highlighted code blocks (```python, ```typescript, ```java, ```sql, etc.)." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points."}
+   ${examplesInstruction}
+
+5. MATH & FORMULAS:
+   ${settings.detailedMath ? "- Format equations, mathematical formulas, and asymptotic complexity in LaTeX ($$ ... $$ for block math, $...$ for inline math)." : "- Keep mathematical and complexity notations simple and inline."}
+
+${customInstruction ? `6. USER CUSTOM FOCUS:\n${customInstruction}` : ""}
+
+DOCUMENT STRUCTURE & FORMATTING:
+- OUTPUT FORMAT: Return clean GitHub-Flavored Markdown (GFM) only. Do NOT wrap the entire response in a top-level code block.
+- NO EMOJIS: Use clean typographic symbols only: ✓ for yes/recommended, ✗ for no/avoid, and → for flow arrows.
+- A4 FRONT COVER PAGE: Always begin the document with the exact A4 cover header format below:
   <header class="note-cover">
-    <h1>${lectureTitle || "[Determine and insert the exact, specific title of this video here]"}</h1>
+    <h1>${lectureTitle || "[Determine and insert the exact specific title of this video here]"}</h1>
     <p class="subtitle">${coverSubtitle}</p>
-    <p class="description">[Write 2-3 dense, rigorous sentences summarizing the specific topics, key mechanisms, and main takeaways actually covered in this lecture]</p>
+    <p class="description">[Write 2-3 clear, informative sentences summarizing the core topics, mechanisms, and key takeaways covered in this lecture]</p>
     <div class="badge-pill">${coverBadge}</div>
   </header>
-- NUMBERED HEADINGS (Following the cover page):
-  ## 1. [Major Section Title]
-  ### 1.1 [Subsection Title]
-- CALLOUT BLOCKS: Use standard blockquotes with bold titles:
-  > **Key Takeaway:** [Core invariant or principle]
-  > **Worked Analogy:** [Concrete real-world mental model]
-  > **Worked Example:** [Step-by-step numbers, variables, calculations]
-  > **Important Warning:** [Edge cases, race conditions, scaling traps]
-- MATH EQUATIONS (LaTeX):
-  ${settings.detailedMath ? "- Block equations: $$ \\text{Partition ID} = |\\text{Hash}(\\text{Key})| \\pmod N $$\n  - Inline math: $N_{\\text{partitions}} = 3$, $O(1)$, $\\lambda = 5$" : "- Basic inline math where necessary."}
-- VECTOR DIAGRAMS (Mermaid):
-  ${diagramInstruction}
-  Use \`\`\`mermaid code blocks with classDef styles and double-quoted labels.
-  - FOR PIPELINES & ARCHITECTURE: Use \`graph LR\` (Left-to-Right) or \`graph TD\` with clean sequential flows.
-  - FOR HIERARCHICAL TREES (BST, B-Trees, Decision Trees, Tiered Architecture):
-    Always preserve horizontal level symmetry. Group same-level nodes in subgraphs with \`direction LR\` or branch symmetrically:
-    \`\`\`mermaid
-    graph TD
-      classDef root fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a,rx:6px,ry:6px;
-      classDef internal fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f,rx:6px,ry:6px;
-      classDef leaf fill:#ecfdf5,stroke:#10b981,stroke-width:2px,color:#064e3b,rx:6px,ry:6px;
+- NUMBERED HEADINGS:
+  ## 1. [Major Topic Title]
+  ### 1.1 [Subtopic Title]
+- CALLOUT BLOCKS: Use standard blockquotes for important takeaways:
+  > **Key Takeaway:** [Core insight or principle]
+  > **Example / Analogy:** [Real-world analogy or walkthrough from the video]
+  > **Important Warning:** [Common pitfalls or edge cases discussed]
+  > **Technical Note / Correction:** [Use when clarifying or correcting a slip-up in the lecture]
+- COMPARISON TABLES: Clean Markdown tables (| Feature / Option | When to Use | Advantages | Limitations |).
+- SUMMARY CHEAT-SHEET: Conclude with a summary section containing a quick reference table and key takeaways.
 
-      R["Root Node: [50]"]:::root
-      
-      subgraph Level1 [" "]
-        direction LR
-        IN1["Internal Node: [20 | 35]"]:::internal
-        IN2["Internal Node: [65 | 80]"]:::internal
-      end
-
-      subgraph Leaves [" "]
-        direction LR
-        L1["Leaf: [10, 15]"]:::leaf <--> L2["Leaf: [22, 30]"]:::leaf <--> L3["Leaf: [55, 60]"]:::leaf <--> L4["Leaf: [70, 85]"]:::leaf
-      end
-
-      R --> IN1 & IN2
-      IN1 --> L1 & L2
-      IN2 --> L3 & L4
-    \`\`\`
-  - Always use double-quoted labels like \`A["Node Name"]\` to avoid syntax errors.
-- COMPARISON TABLES: Clean GFM tables (| Option | Pros | Cons | When to use |).
-${settings.includeCode ? "- CODE SNIPPETS: Fenced code blocks with language tag (```java, ```typescript, ```sql, etc.). Use inline backticks for `terms` and `config_keys`." : "- CODE SNIPPETS: Omit long code snippets unless strictly conceptual."}
-${examplesInstruction}
-- SUMMARY CHEAT-SHEET: Conclude with a numbered section containing a "Summary Cheat-Sheet" table and a "Big-Picture Architecture" model.
-
-Lecture Configuration:
-Detail Level: ${settings.detailLevel}; Diagrams: ${settings.diagramDensity}; Examples: ${settings.examples}; Include Code: ${settings.includeCode}; Math Formulas: ${settings.detailedMath}.
-${customInstruction}
-${transcriptSection}`;
+${transcriptSection}
+`;
 }
-
-// ─── Edit/Refine Notes Prompt ───────────────────────────────────────────────
 
 export function buildEditPrompt(markdown: string, instruction: string, selection?: string): string {
   if (selection && selection.trim().length > 0) {
-    return `You are an expert academic technical editor.
-Modify the following lecture-notes Markdown document according to the user's instruction, focusing specifically on refining the targeted section.
-
-Targeted Selection to modify:
+    return `You are an expert technical note editor.
+Instruction: "${instruction}"
+Selected Text to refine:
 """
-${selection.trim()}
+${selection}
 """
 
-User Instruction: "${instruction}"
-
-Full Existing Markdown Document:
+Full Document Context:
 """
 ${markdown}
 """
 
 Task:
-1. Locate the targeted section within the document.
-2. Apply the user's instruction specifically to refine, rewrite, expand, or simplify that section.
-3. Keep the rest of the document, headings, LaTeX formulas, tables, and Mermaid flowcharts intact.
-4. Output the COMPLETE updated Markdown document.
-
-CRITICAL: Return ONLY raw Markdown text. Do NOT wrap the entire output in markdown code fences.`;
+1. Apply the user's instruction specifically to the Selected Text within the document context.
+2. Return the COMPLETE revised markdown document.
+3. Preserve all existing CSS classes, HTML cover headers, Mermaid diagrams, and LaTeX math formulas.
+4. Output clean Markdown only, no meta-commentary or wrapping backticks.`;
   }
 
-  return `You are an expert academic technical editor.
-Modify this existing lecture-notes Markdown according to the user's instruction: "${instruction}".
-Preserve unrelated content, structure, LaTeX formulas, diagrams, tables and formatting.
+  return `You are an expert technical note editor.
+Instruction: "${instruction}"
 
-Full Existing Markdown Document:
+Document:
 """
 ${markdown}
 """
 
-Task: Return the COMPLETE revised Markdown document adhering to the instruction.
-CRITICAL: Return ONLY raw Markdown text. Do NOT wrap the entire output in markdown code fences.`;
+Task:
+1. Modify the document according to the user's instruction.
+2. Return the COMPLETE updated markdown document.
+3. Preserve all existing CSS classes (<header class="note-cover">, etc.), Mermaid diagrams, and LaTeX math formulas.
+4. Output clean Markdown only, no meta-commentary or wrapping backticks.`;
 }
