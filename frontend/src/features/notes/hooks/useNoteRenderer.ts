@@ -53,6 +53,20 @@ export const MERMAID_PALETTES: Record<string, { fill: string; stroke: string; te
 export function applyTranslucentColorPaletteToSvg(svgEl: SVGSVGElement | HTMLElement, themeId: string): void {
   if (!svgEl) return;
   const palette = MERMAID_PALETTES[themeId] || MERMAID_PALETTES.amber;
+
+  // Prevent simple/narrow diagrams from stretching to full container width
+  const svg = svgEl as SVGSVGElement;
+  const viewBox = svg.getAttribute('viewBox');
+  if (viewBox) {
+    const parts = viewBox.trim().split(/[\s,]+/).map(Number);
+    if (parts.length === 4 && parts[2] > 0) {
+      const naturalWidth = parts[2];
+      // Cap max-width to the natural diagram width (up to 820px)
+      svg.style.maxWidth = `${Math.min(naturalWidth, 820)}px`;
+      svg.style.width = '100%';
+    }
+  }
+
   const nodeGroups = svgEl.querySelectorAll('g.node, g.actor');
 
   nodeGroups.forEach((nodeGroup, index) => {
@@ -74,18 +88,50 @@ export function applyTranslucentColorPaletteToSvg(svgEl: SVGSVGElement | HTMLEle
       }
     });
 
-    // Make text readable, bold, high-contrast, and prevent clipping
+    // Make text readable, crisp, high-contrast, and prevent bottom clipping
     const labelElements = nodeGroup.querySelectorAll('.label div, .label span, .label p, text');
     labelElements.forEach((el) => {
       const htmlEl = el as HTMLElement;
       htmlEl.style.color = color.text;
       htmlEl.style.fontWeight = '600';
-      htmlEl.style.fontSize = '12px';
-      htmlEl.style.lineHeight = '1.35';
+      htmlEl.style.fontSize = '11.5px';
+      htmlEl.style.lineHeight = '1.25';
       htmlEl.style.textAlign = 'center';
       htmlEl.style.wordBreak = 'normal';
       htmlEl.style.overflowWrap = 'break-word';
+      htmlEl.style.padding = '0';
     });
+
+    // Dynamically adjust rect and foreignObject dimensions to prevent multi-line text cutoff
+    const foreignObject = nodeGroup.querySelector('foreignObject');
+    const labelDiv = nodeGroup.querySelector('.label div') as HTMLElement | null;
+    const rect = nodeGroup.querySelector('rect.label-container, rect') as SVGRectElement | null;
+
+    if (foreignObject && labelDiv && rect) {
+      foreignObject.style.overflow = 'visible';
+      labelDiv.style.overflow = 'visible';
+
+      labelDiv.style.display = 'flex';
+      labelDiv.style.flexDirection = 'column';
+      labelDiv.style.justifyContent = 'center';
+      labelDiv.style.alignItems = 'center';
+      labelDiv.style.minHeight = '100%';
+
+      const contentHeight = Math.max(labelDiv.scrollHeight, labelDiv.offsetHeight);
+      const currentRectHeight = parseFloat(rect.getAttribute('height') || '0');
+
+      if (contentHeight > currentRectHeight - 6 && currentRectHeight > 0) {
+        const neededHeight = contentHeight + 14;
+        rect.setAttribute('height', `${neededHeight}`);
+        foreignObject.setAttribute('height', `${neededHeight}`);
+
+        const currentRectY = parseFloat(rect.getAttribute('y') || '0');
+        if (currentRectY < 0) {
+          rect.setAttribute('y', `${-neededHeight / 2}`);
+          foreignObject.setAttribute('y', `${-neededHeight / 2}`);
+        }
+      }
+    }
   });
 
   // Ensure all foreignObjects and labels inside SVG have visible overflow
@@ -182,15 +228,15 @@ export function useNoteRenderer({
               suppressErrorRendering: true,
               flowchart: {
                 curve: 'basis',
-                padding: 24,
-                nodeSpacing: 45,
-                rankSpacing: 40,
+                padding: 18,
+                nodeSpacing: 35,
+                rankSpacing: 35,
                 htmlLabels: true,
                 useMaxWidth: true,
               },
               themeVariables: {
                 fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-                fontSize: '12.5px',
+                fontSize: '11.5px',
                 primaryColor: '#f8fafc',
                 primaryBorderColor: '#cbd5e1',
                 primaryTextColor: '#0f172a',

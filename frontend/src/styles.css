@@ -868,10 +868,8 @@ div.mermaid {
 }
 .note-content .mermaid svg,
 .mermaid svg,
-div.mermaid svg,
-.note-content svg {
-  width: auto !important;
-  max-width: 100% !important;
+div.mermaid svg {
+  max-width: 100%;
   height: auto !important;
   margin-left: auto !important;
   margin-right: auto !important;
@@ -885,7 +883,8 @@ div.mermaid svg,
 .mermaid .label div,
 .mermaid .label span,
 .mermaid .node text {
-  line-height: 1.35 !important;
+  font-size: 11.5px !important;
+  line-height: 1.25 !important;
   word-break: normal !important;
   overflow-wrap: break-word !important;
 }
