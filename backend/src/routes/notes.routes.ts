@@ -24,10 +24,9 @@ const notePayloadSchema = settings.extend({
   videoId,
   videoTitle: z.string().trim().min(1).max(300).optional(),
   customPrompt: z.string().max(2000).optional(),
-  transcript: z
-    .array(transcriptEntrySchema)
-    .min(1, "Cannot generate notes: Transcript is not available for this video."),
+  transcript: z.array(transcriptEntrySchema).optional().default([]),
 });
+
 
 type NotePayload = z.infer<typeof notePayloadSchema>;
 

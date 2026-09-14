@@ -78,15 +78,11 @@ async function buildNotePayload(params: GenerateNotesParams) {
 
   let titleCandidate = params.customTopic?.trim() || `Lecture Notes — ${videoId}`;
 
-  // Transcript extracted directly by extension content script
+  // Transcript extracted directly by extension content script (if available)
   const effectiveTranscript =
     params.transcript && params.transcript.length > 0
       ? params.transcript
       : await fetchBrowserTranscript(videoId);
-
-  if (!effectiveTranscript || effectiveTranscript.length === 0) {
-    throw new Error('Cannot generate notes: Transcript is not available for this video.');
-  }
 
   return {
     videoId,
@@ -95,7 +91,7 @@ async function buildNotePayload(params: GenerateNotesParams) {
       videoId,
       videoTitle: titleCandidate,
       customPrompt: params.customPrompt || undefined,
-      transcript: effectiveTranscript,
+      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
       detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
       diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
       examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
@@ -103,6 +99,7 @@ async function buildNotePayload(params: GenerateNotesParams) {
       detailedMath: params.settings?.detailedMath !== false,
     },
   };
+
 }
 
 export const notesApi = {
