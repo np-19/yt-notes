@@ -32,7 +32,28 @@ function resolveDocumentTitle(markdown: string, fallbackTitle?: string): string 
   const match =
     markdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i) ||
     markdown.match(/^#\s+([^\n]+)/m);
-  return fallbackTitle || match?.[1]?.trim() || "Lecture Notes";
+
+  const rawTitle = match?.[1]?.trim().replace(/<[^>]+>/g, "");
+  if (
+    rawTitle &&
+    !rawTitle.startsWith("[") &&
+    rawTitle !== "Synthesized Notes" &&
+    rawTitle !== "Synthesized Academic Notes" &&
+    !rawTitle.startsWith("Lecture Notes —")
+  ) {
+    return rawTitle;
+  }
+
+  if (
+    fallbackTitle &&
+    fallbackTitle !== "Synthesized Notes" &&
+    fallbackTitle !== "Synthesized Academic Notes" &&
+    !fallbackTitle.startsWith("Lecture Notes —")
+  ) {
+    return fallbackTitle;
+  }
+
+  return rawTitle || fallbackTitle || "Technical Lecture Notes";
 }
 
 router.post("/", async (req, res, next) => {

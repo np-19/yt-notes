@@ -182,12 +182,13 @@ ${customInstruction ? `6. USER CUSTOM FOCUS:\n${customInstruction}` : ""}
 DOCUMENT STRUCTURE & FORMATTING:
 - OUTPUT FORMAT: Return clean GitHub-Flavored Markdown (GFM) only. Do NOT wrap the entire response in a top-level code block.
 - NO EMOJIS: Use clean typographic symbols only: ✓ for yes/recommended, ✗ for no/avoid, and → for flow arrows.
-- A4 FRONT COVER PAGE: Always begin the document with the exact A4 cover header format below:
+- A4 FRONT COVER PAGE (MANDATORY EXACT FORMAT):
+  Always begin the document with the exact A4 cover header format below. Synthesize a precise, domain-accurate technical lecture title, a tailored technical subtitle, and a rich specific overview based directly on what was taught in the transcript — NEVER output generic placeholders or filler text:
   <header class="note-cover">
-    <h1>${lectureTitle || "[Determine and insert the exact specific title of this video here]"}</h1>
-    <p class="subtitle">${coverSubtitle}</p>
-    <p class="description">[Write 2-3 clear, informative sentences summarizing the core topics, mechanisms, and key takeaways ACTUALLY covered in this lecture — not inferred or invented]</p>
-    <div class="badge-pill">${coverBadge}</div>
+    <h1>${lectureTitle ? lectureTitle : "[Determine and write the exact, comprehensive lecture title based directly on the transcript content, e.g. 'System Design: Distributed Cache & Database Sharding Architecture']"}</h1>
+    <p class="subtitle">${customInstruction ? coverSubtitle : "[Write a tailored, specific technical subtitle describing this lecture's core domain, e.g. 'Comprehensive System Design Study Guide & Technical Blueprint']"}</p>
+    <p class="description">[Write 2-3 precise, informative sentences summarizing the exact concepts, mechanisms, algorithms, architectures, and trade-offs ACTUALLY taught in this lecture — explicitly naming key technologies and core methodologies mentioned in the transcript]</p>
+    <div class="badge-pill">${coverBadge ? coverBadge : "[Tailored domain badge, e.g. 'Distributed Systems & Architecture • Master Study Guide']"}</div>
   </header>
 - NUMBERED HEADINGS WITH TIMESTAMPS:
   ## 1. [Major Topic Title] [mm:ss]

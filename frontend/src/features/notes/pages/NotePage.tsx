@@ -57,13 +57,48 @@ export const NotePage: React.FC = () => {
       },
 
       (_chunk, cumulative) => {
-        setActiveDocument((prev) => (prev ? { ...prev, htmlContent: cumulative } : prev));
+        const matchTitle =
+          cumulative.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i)?.[1]?.trim().replace(/<[^>]+>/g, "") ||
+          cumulative.match(/^#\s+([^\n]+)/m)?.[1]?.trim().replace(/<[^>]+>/g, "");
+
+        setActiveDocument((prev) => {
+          if (!prev) return prev;
+          const validTitle =
+            matchTitle &&
+            !matchTitle.startsWith("[") &&
+            matchTitle !== "Synthesized Notes" &&
+            matchTitle !== "Synthesized Academic Notes"
+              ? matchTitle
+              : prev.title;
+
+          return { ...prev, title: validTitle, htmlContent: cumulative };
+        });
       },
       async (finalMarkdown, resolvedTitle) => {
         const now = new Date().toISOString();
+        const extractedTitle =
+          finalMarkdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i)?.[1]?.trim().replace(/<[^>]+>/g, "") ||
+          finalMarkdown.match(/^#\s+([^\n]+)/m)?.[1]?.trim().replace(/<[^>]+>/g, "");
+
+        const chosenTitle =
+          extractedTitle &&
+          !extractedTitle.startsWith("[") &&
+          extractedTitle !== "Synthesized Notes" &&
+          extractedTitle !== "Synthesized Academic Notes"
+            ? extractedTitle
+            : resolvedTitle &&
+              resolvedTitle !== "Synthesized Notes" &&
+              resolvedTitle !== "Synthesized Academic Notes"
+            ? resolvedTitle
+            : draftData.customTopic &&
+              draftData.customTopic !== "Synthesized Notes" &&
+              draftData.customTopic !== "Synthesized Academic Notes"
+            ? draftData.customTopic
+            : "Technical Lecture Notes";
+
         const finalNote: Note = {
           id: noteId,
-          title: resolvedTitle || draftData.customTopic || 'Synthesized Academic Notes',
+          title: chosenTitle,
           videoUrl: draftData.youtubeUrl,
           htmlContent: finalMarkdown,
           createdAt: now,
