@@ -171,6 +171,7 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
 5. MATH, FORMULAS & CODE FORMATTING RULES (STRICT LATEX RULES):
    ${settings.detailedMath ? "- Use LaTeX ($$ ... $$ for display math, $...$ for inline math) for EVERY pure mathematical equation, arithmetic proof, probability expression, and Big-O asymptotic notation that appears in the transcript (e.g., $O(N \\log N)$, $T(n) = 2T(n/2) + O(n)$) — apply this consistently across the whole document, not just the first occurrence; don't leave some equations in LaTeX and others as plain text." : "- Do NOT use LaTeX ($ or $$) anywhere in this document. Write all math and complexity notation as plain inline text using standard characters and Unicode symbols instead: exponents/subscripts spelled out or written with ^ and _ (e.g. `O(n log n)`, `T(n) = 2T(n/2) + O(n)`, `x^2 + y^2`), and symbols like ×, ÷, ≤, ≥, ≈, √ where natural. Apply this same plain-text style everywhere math appears in the document — never mix in a stray $...$ block."}
    - ABSOLUTE PROHIBITION: NEVER put SQL queries, database schema statements, API endpoints, variable names, or programming code inside LaTeX math ($$ or $). Format SQL/code strictly as inline backticks (\`SELECT * FROM ...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`).
+   - ABSOLUTE PROHIBITION #2: NEVER wrap plain English words, acronyms, or labels in LaTeX math delimiters just because they appear in a technical sentence. Acronyms like CRUD, API, JWT, HTTP, or terms like "Read Operations" must be written as plain text (use **bold** or \`inline code\` for emphasis instead) — wrapping them in $...$ forces them into italic math typesetting and makes them render incorrectly. Reserve $...$/$$...$$ strictly for actual mathematical expressions (numbers, operators, variables in an equation, Big-O notation).
    - LATEX ESCAPING RULES:
      a. In LaTeX math, all literal underscores must be escaped as \\_ (e.g. \$\\text{max\\_connections}\$).
      b. In LaTeX math, percent signs must be escaped as \\% (e.g. \$99.9\\%\$ availability).
@@ -180,7 +181,6 @@ ${customInstruction ? `6. USER CUSTOM FOCUS:\n${customInstruction}` : ""}
  
 DOCUMENT STRUCTURE & FORMATTING:
 - OUTPUT FORMAT: Return clean GitHub-Flavored Markdown (GFM) only. Do NOT wrap the entire response in a top-level code block.
-- NO HORIZONTAL DIVIDERS: Do NOT use horizontal divider lines (`---` or `***`) between sections.
 - NO EMOJIS: Use clean typographic symbols only: ✓ for yes/recommended, ✗ for no/avoid, and → for flow arrows.
 - A4 FRONT COVER PAGE: Always begin the document with the exact A4 cover header format below:
   <header class="note-cover">
@@ -192,6 +192,8 @@ DOCUMENT STRUCTURE & FORMATTING:
 - NUMBERED HEADINGS WITH TIMESTAMPS:
   ## 1. [Major Topic Title] [mm:ss]
   ### 1.1 [Subtopic Title] [mm:ss]
+- NAMED CATEGORIES MUST ALSO BE HEADINGS (not plain text): whenever the video or your own structuring introduces a named category or label inside a section — e.g. "Functional Requirements", "Non-Functional Requirements", "Constraints", "Workload", "Access Patterns" — that label must be its own \`####\` (or deeper) heading on its own line, never a bare sentence that just starts a paragraph. If you find yourself writing a short noun-phrase label followed by a colon-less explanatory paragraph, that label needs a heading marker, not plain text. This applies at every nesting level, down to small sub-categories within a subtopic.
+- NO MANUAL DIVIDERS: Never insert a horizontal rule (\`---\`) anywhere in the document, including between sections or at the very end. Headings alone provide the visual separation; an extra \`---\` produces an unwanted stray line in the rendered output.
 - CALLOUT BLOCKS: Use standard blockquotes for important takeaways:
   > **Key Takeaway:** [Core insight or principle actually stated]
   > **Example / Analogy:** [Real-world analogy or walkthrough actually used in the video]
@@ -204,7 +206,6 @@ DOCUMENT STRUCTURE & FORMATTING:
 ${transcriptSection}
 `;
 }
-
 export function buildEditPrompt(markdown: string, instruction: string, selection?: string | string[]): string {
   let selectionBlock = "";
   if (Array.isArray(selection) && selection.length > 0) {
