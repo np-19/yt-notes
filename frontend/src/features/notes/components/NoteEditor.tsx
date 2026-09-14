@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Note } from '../types/notes.types';
 import { NOTE_THEMES } from '../../../constants';
-import { parseMarkdownToHtml, extractMarkdownHeadings } from '../../../lib/markdown';
+import { parseMarkdownToHtml, extractMarkdownHeadings, repairMermaidDiagram } from '../../../lib/markdown';
 import { Button } from '../../../components/ui/Button';
 import katex from 'katex';
 import renderMathInElement from 'katex/dist/contrib/auto-render.mjs';
@@ -448,57 +448,61 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
                   targetContainer = div;
                 }
 
-                let cleanDiagram = rawText.replace(/^```mermaid\s*/i, '').replace(/```$/i, '').trim();
-                if (
-                  !cleanDiagram.startsWith('graph') &&
-                  !cleanDiagram.startsWith('flowchart') &&
-                  !cleanDiagram.startsWith('sequenceDiagram') &&
-                  !cleanDiagram.startsWith('classDiagram') &&
-                  !cleanDiagram.startsWith('stateDiagram') &&
-                  !cleanDiagram.startsWith('erDiagram') &&
-                  !cleanDiagram.startsWith('gantt') &&
-                  !cleanDiagram.startsWith('pie')
-                ) {
-                  cleanDiagram = `graph TD\n${cleanDiagram}`;
-                }
-
-                // Auto-repair unquoted node labels like B[Text (with parens & symbols)] -> B["Text (with parens & symbols)"]
-                cleanDiagram = cleanDiagram.replace(/([\w-]+)\[([^"\]\n]+)\]/g, (_, id, label) => {
-                  return `${id}["${label.replace(/"/g, "'")}"]`;
-                });
+                let cleanDiagram = repairMermaidDiagram(rawText);
 
                 const renderId = `mermaid-svg-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`;
+                let renderedSvg: string | null = null;
+
+                // Primary render attempt
                 try {
                   const { svg } = await mermaid.render(renderId, cleanDiagram);
-                  if (targetContainer && document.body.contains(targetContainer)) {
-                    targetContainer.innerHTML = svg;
-                    targetContainer.setAttribute('data-processed', 'true');
-
-                    // Force direct inline centering on the container and rendered SVG
-                    targetContainer.style.display = 'flex';
-                    targetContainer.style.justifyContent = 'center';
-                    targetContainer.style.alignItems = 'center';
-                    targetContainer.style.margin = '24px auto';
-                    targetContainer.style.width = '100%';
-                    targetContainer.style.textAlign = 'center';
-
-                    const svgEl = targetContainer.querySelector('svg');
-                    if (svgEl) {
-                      applyTranslucentColorPaletteToSvg(svgEl, activeThemeId);
-                      svgEl.style.display = 'block';
-                      svgEl.style.marginLeft = 'auto';
-                      svgEl.style.marginRight = 'auto';
-                      svgEl.style.maxWidth = '100%';
-                      svgEl.style.maxHeight = '420px';
-                      svgEl.style.width = 'auto';
-                    }
-                  }
+                  renderedSvg = svg;
                 } catch (diagramErr) {
-                  console.warn('Skipping unparseable Mermaid diagram (will retry if updated):', diagramErr);
-                  // Do NOT mark data-processed="true" so updates or complete inputs can render
                   // Clean up any lingering error element created by Mermaid in document
                   const errEls = document.querySelectorAll(`[id^="d${renderId}"], [id^="${renderId}"]`);
                   errEls.forEach((el) => el.remove());
+
+                  // Secondary simplified fallback attempt: normalize all node shapes to standard ["..."]
+                  try {
+                    const fallbackDiagram = cleanDiagram
+                      .replace(/([\w-]+)\[\(\s*"?([^"\]\n]+?)"?\s*\)\]/g, '$1["$2"]')
+                      .replace(/([\w-]+)\(\[\s*"?([^"\]\n]+?)"?\s*\]\)/g, '$1["$2"]')
+                      .replace(/([\w-]+)\{\{\s*"?([^"\}\n]+?)"?\s*\}\}/g, '$1["$2"]')
+                      .replace(/([\w-]+)\[\[\s*"?([^"\]\n]+?)"?\s*\]\]/g, '$1["$2"]')
+                      .replace(/([\w-]+)\{\s*"?([^"\}\n]+?)"?\s*\}/g, '$1["$2"]')
+                      .replace(/([\w-]+)\(\(\s*"?([^"\)\n]+?)"?\s*\)\)/g, '$1["$2"]');
+                    const fallbackId = `${renderId}-fb`;
+                    const { svg } = await mermaid.render(fallbackId, fallbackDiagram);
+                    renderedSvg = svg;
+                  } catch (fallbackErr) {
+                    console.warn('Skipping unparseable Mermaid diagram after fallback:', diagramErr, fallbackErr);
+                    const errElsFb = document.querySelectorAll(`[id^="d${renderId}"], [id^="${renderId}"]`);
+                    errElsFb.forEach((el) => el.remove());
+                  }
+                }
+
+                if (renderedSvg && targetContainer && document.body.contains(targetContainer)) {
+                  targetContainer.innerHTML = renderedSvg;
+                  targetContainer.setAttribute('data-processed', 'true');
+
+                  // Force direct inline centering on the container and rendered SVG
+                  targetContainer.style.display = 'flex';
+                  targetContainer.style.justifyContent = 'center';
+                  targetContainer.style.alignItems = 'center';
+                  targetContainer.style.margin = '24px auto';
+                  targetContainer.style.width = '100%';
+                  targetContainer.style.textAlign = 'center';
+
+                  const svgEl = targetContainer.querySelector('svg');
+                  if (svgEl) {
+                    applyTranslucentColorPaletteToSvg(svgEl, activeThemeId);
+                    svgEl.style.display = 'block';
+                    svgEl.style.marginLeft = 'auto';
+                    svgEl.style.marginRight = 'auto';
+                    svgEl.style.maxWidth = '100%';
+                    svgEl.style.maxHeight = '420px';
+                    svgEl.style.width = 'auto';
+                  }
                 }
               }
             }

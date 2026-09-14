@@ -18,6 +18,107 @@ export function isHtmlContent(content: string): boolean {
   );
 }
 
+export function repairMermaidDiagram(source: string): string {
+  if (!source) return "";
+  let diagram = source.trim();
+
+  // 1. Decode any HTML entities (&gt;, &lt;, &amp;, &quot;, &#39;)
+  diagram = diagram
+    .replace(/&gt;/g, '>')
+    .replace(/&lt;/g, '<')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  // 2. Strip code fences if present
+  diagram = diagram.replace(/^```(?:mermaid)?\s*/i, '').replace(/```\s*$/i, '').trim();
+
+  // 3. Ensure valid diagram header
+  const headerMatch = diagram.match(/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|gitGraph|mindmap|quadrantChart|journey|sankey-beta)\b/i);
+  if (!headerMatch) {
+    diagram = `graph TD\n${diagram}`;
+  } else {
+    diagram = diagram.replace(/^(graph|flowchart)\s+([a-z]{2})\b/i, (_, type, dir) => `${type} ${dir.toUpperCase()}`);
+  }
+
+  // 4. Fix reserved keywords and auto-quote labels
+  const reservedWords = ['end', 'node', 'graph', 'subgraph', 'linkStyle', 'style', 'class', 'default', 'click', 'callback'];
+  const lines = diagram.split('\n');
+  let openSubgraphs = 0;
+
+  const fixedLines = lines.map((line) => {
+    let l = line;
+    const trimmed = l.trim();
+
+    if (/^subgraph\s+/i.test(trimmed)) {
+      openSubgraphs++;
+      const sgMatch = trimmed.match(/^subgraph\s+([A-Za-z0-9_]+)?\s*\[?"?([^"\]\n]+)"?\]?/i);
+      if (sgMatch) {
+        const id = sgMatch[1] || `sg_${Math.random().toString(36).substring(2, 6)}`;
+        const title = sgMatch[2] || id;
+        return `  subgraph ${id} ["${title.replace(/"/g, "'")}"]`;
+      }
+      return l;
+    }
+
+    if (trimmed === 'end') {
+      openSubgraphs = Math.max(0, openSubgraphs - 1);
+      return l;
+    }
+
+    if (trimmed.startsWith('%%') || /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram)/i.test(trimmed)) {
+      return l;
+    }
+
+    // Replace reserved words used as node IDs
+    reservedWords.forEach((word) => {
+      l = l.replace(new RegExp(`(^|\\s)(${word})(?=\\s*(\\[|\\(|\\{|\\>|---|-->|-\\.-|==>))`, 'g'), `$1${word}_node`);
+      l = l.replace(new RegExp(`(-->|---|-.->|==>|\\|[^\\|]+\\|\\s*)(${word})(?=\\s*(\\[|\\(|\\{|\\s|$))`, 'g'), `$1$2_node`);
+    });
+
+    // Auto-quote all Mermaid node shapes:
+    // Cylinder: id[("Label")]
+    l = l.replace(/([\w-]+)\[\(\s*"?([^"\]\n]+?)"?\s*\)\]/g, '$1[("$2")]');
+    // Stadium: id(["Label"])
+    l = l.replace(/([\w-]+)\(\[\s*"?([^"\]\n]+?)"?\s*\]\)/g, '$1(["$2"])');
+    // Hexagon: id{{"Label"}}
+    l = l.replace(/([\w-]+)\{\{\s*"?([^"\}\n]+?)"?\s*\}\}/g, '$1{{"$2"}}');
+    // Subroutine: id[["Label"]]
+    l = l.replace(/([\w-]+)\[\[\s*"?([^"\]\n]+?)"?\s*\]\]/g, '$1[["$2"]]');
+    // Decision / Rhombus: id{"Label"}
+    l = l.replace(/([\w-]+)\{\s*"?([^"\}\n]+?)"?\s*\}/g, '$1{"$2"}');
+    // Circle: id(("Label"))
+    l = l.replace(/([\w-]+)\(\(\s*"?([^"\)\n]+?)"?\s*\)\)/g, '$1(("$2"))');
+    // Standard Square: id["Label"]
+    l = l.replace(/([\w-]+)\[\s*"?([^"\]\n]+?)"?\s*\]/g, (_m, id, label) => {
+      if (label.startsWith('(') && label.endsWith(')')) return _m;
+      if (label.startsWith('[') && label.endsWith(']')) return _m;
+      return `${id}["${label.replace(/"/g, "'")}"]`;
+    });
+    // Standard Round / Parens: id("Label")
+    l = l.replace(/([\w-]+)\(\s*"?([^"\)\n]+?)"?\s*\)/g, (_m, id, label) => {
+      if (label.startsWith('[') && label.endsWith(']')) return _m;
+      if (label.startsWith('(') && label.endsWith(')')) return _m;
+      return `${id}("${label.replace(/"/g, "'")}")`;
+    });
+
+    // Clean pipe edge labels: A -->|Label| B -> A -->|"Label"| B
+    l = l.replace(/\|([^\|\n]+)\|/g, (_m, edgeLabel) => {
+      const cleanEdge = edgeLabel.trim().replace(/"/g, "'");
+      return `|"${cleanEdge}"|`;
+    });
+
+    return l;
+  });
+
+  while (openSubgraphs > 0) {
+    fixedLines.push('end');
+    openSubgraphs--;
+  }
+
+  return fixedLines.join('\n');
+}
+
 export function healMarkdownDefects(markdown: string): string {
   if (!markdown) return "";
   let text = markdown;
@@ -35,14 +136,10 @@ export function healMarkdownDefects(markdown: string): string {
   // 2. Escape isolated currency dollar amounts (e.g., "$50" or "$100/mo") to prevent accidental math mode across paragraphs
   text = text.replace(/(^|\s)\$(\d+(?:\.\d{1,2})?)(?=\s|[.,;!?\/\)]|$)/g, '$1\\$$2');
 
-  // 3. Auto-repair Mermaid diagrams: quote unquoted node labels with parentheses, colons, or slashes
+  // 3. Auto-repair Mermaid diagrams using comprehensive syntax healer
   text = text.replace(/```mermaid\s*([\s\S]*?)```/gi, (_match, diagramBody) => {
-    const lines = diagramBody.split('\n');
-    const fixedLines = lines.map((line: string) => {
-      // If line is a node declaration with unquoted parens, colons, or slashes: A[Client (React)] -> A["Client (React)"]
-      return line.replace(/([A-Za-z0-9_]+)\[([^"\]\n]+[\(:/][^"\]\n]*)\]/g, '$1["$2"]');
-    });
-    return `\`\`\`mermaid\n${fixedLines.join('\n')}\n\`\`\``;
+    const fixed = repairMermaidDiagram(diagramBody);
+    return `\`\`\`mermaid\n${fixed}\n\`\`\``;
   });
 
   // 4. Strip unwanted horizontal dividing lines (---, ***, ___)
