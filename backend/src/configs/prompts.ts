@@ -34,6 +34,8 @@ export function buildNotesPrompt(
   transcript: TranscriptEntry[],
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
 ): string {
+
+
   const isGeneric =
     !settings.videoTitle ||
     settings.videoTitle === "Synthesized Academic Notes" ||
@@ -43,6 +45,7 @@ export function buildNotesPrompt(
 
   const lectureTitle = !isGeneric ? settings.videoTitle?.trim() || "" : "";
 
+  // Helper to format ms offsets as [mm:ss] for citing moments in the video.
   const formatOffset = (ms: number) => {
     const totalSeconds = Math.floor(ms / 1000);
     const m = Math.floor(totalSeconds / 60);
@@ -67,42 +70,48 @@ export function buildNotesPrompt(
     coverBadge = "Quick Reference • Summary Notes";
     lengthAndDepthInstruction = `
 DETAIL LEVEL: CONCISE SUMMARY / KEY POINTS
-- GOAL: Provide a high-level, fast-to-read summary capturing all key topics, essential definitions, and main takeaways ACTUALLY PRESENT in the transcript.
+- GOAL: Include EVERY concept and topic the video actually covers — shortened only in how each one is explained, never in how many are included.
+- WHAT "SHORT" MEANS HERE (read carefully — this is the opposite of dropping content):
+  - Do NOT skip, merge, or silently drop any topic, concept, or term the speaker introduces, even minor ones. If the video covers 15 concepts, the notes must reference all 15.
+  - "Short" applies only to the LENGTH of each explanation: 1-2 tight sentences or a short bullet per concept instead of a full walkthrough. It does not mean fewer concepts.
+  - No worked examples, no code walkthroughs, no multi-paragraph explanations — state each definition/point plainly and move on.
 - APPROACH:
-  - Cover every topic presented in the video, keeping explanations crisp, direct, and focused on core principles the speaker actually covered.
-  - Break into clear numbered sections matching the video's chapters or topics, in the order they appear in the transcript.
-  - Include essential definitions and a concise summary table or takeaway cheat-sheet, drawn only from what was said.`;
+  - Break into clear numbered sections matching the video's chapters or topics, in the order they appear in the transcript, so the full topic list is visible at a glance.
+  - Give a short, accurate definition or one-line explanation for each concept — nothing added beyond what the video actually states.
+  - Conclude with a concise summary table or cheat-sheet that lists every topic covered, not just the ones you judged most important.`;
   } else if (settings.detailLevel === "deep_dive") {
     coverSubtitle = "Exhaustive Technical Masterclass & Engineering Guide";
     coverBadge = "Exhaustive Deep Dive • Master Study Guide";
     lengthAndDepthInstruction = `
 DETAIL LEVEL: EXHAUSTIVE TECHNICAL MASTERCLASS (DEEP DIVE)
-- GOAL: Produce an exhaustive, publication-grade study guide that documents 100% of the video's content and clearly distinguishes it from any supplementary context you add.
-
-- STRICT REQUIREMENT: COMPLETE & UNTRUNCATED VIDEO COVERAGE
+- GOAL: This tier is TWO LAYERS, and they must never be mixed together:
+  Layer 1 (mandatory, base layer): Exactly what's in the video — same completeness and fidelity requirement as the Standard tier below, covering 100% of what was actually taught.
+  Layer 2 (optional, additive): Your own deeper technical explanation, added ONLY where you judge it meaningfully helps understanding, and ALWAYS visually separated from Layer 1.
+ 
+- STRICT REQUIREMENT: COMPLETE & UNTRUNCATED VIDEO COVERAGE (Layer 1)
   - Follow the video chronologically from beginning to end without skipping, summarizing away, or omitting ANY section, demo, code walkthrough, slide, or speaker explanation that appears in the transcript.
   - Retain the author's exact nuances, examples, diagrams, and terminology as given — do not substitute your own examples for the speaker's.
-
-- LAYERED 4-TIER TECHNICAL DEPTH (Apply to every major concept/topic the video actually covers):
-  1. First Principles & Motivation: What exact problem does this solve, as explained (or implied) by the speaker?
-  2. Internal Mechanics & Execution Flow: Step-by-step breakdown of how it works, based on what was shown/said, using standard technical knowledge only to fill in mechanics the speaker referenced but didn't spell out.
-  3. Failure Modes, Gotchas & Anti-Patterns: Real-world edge cases the speaker mentioned; if you add well-known pitfalls beyond what was said, label them clearly per the "Beyond the Video" rule below.
-  4. Practical Trade-Offs & Decision Rules: Rules of thumb grounded in what was demonstrated or stated.
-
-- ENRICHMENT MUST BE LABELED, NEVER BLENDED:
-  - Anything you add that goes beyond what the transcript actually contains (extra context, deeper mechanics, additional pitfalls) must be placed in its own clearly marked callout: \`> **Beyond the Video:** [added context]\`.
-  - Never merge invented specifics into a paragraph so it reads as something the speaker said.
-
+  - This layer alone must already be a complete, faithful record of the lecture, exactly as required in Standard mode — it cannot rely on Layer 2 to "fill in" content the speaker actually covered.
+ 
+- WHEN TO ADD LAYER 2 (deeper technical explanation):
+  - Add it when a concept the speaker mentions has real depth worth unpacking for the learner (e.g. they name a mechanism but don't explain how it works internally, or reference a trade-off without detailing it).
+  - Do not add it reflexively to every single concept just to seem thorough — only where it adds genuine understanding.
+  - Structure Layer 2 additions, where used, around: (1) First Principles & Motivation, (2) Internal Mechanics & Execution Flow, (3) Failure Modes & Anti-Patterns, (4) Practical Trade-Offs & Decision Rules — use whichever of these four are relevant, not all four every time.
+ 
+- LAYER 2 MUST BE LABELED, NEVER BLENDED INTO LAYER 1:
+  - Every Layer 2 addition goes in its own clearly marked callout: \`> **Beyond the Video:** [added context]\`, placed directly after the Layer 1 content it expands on.
+  - Never merge invented specifics into a paragraph so it reads as something the speaker actually said. A reader must always be able to tell, at a glance, what came from the video versus what you added.
+ 
 - CODE & WALKTHROUGH RIGOR:
   - Extract and present full, working code implementations exactly as shown, with line-by-line annotations explaining the non-obvious logic.
   - If code shown on screen is partial, cut off, or illegible from the transcript, say so explicitly — do NOT complete or guess the missing lines.
-
+ 
 - ARCHITECTURE & VECTOR DIAGRAMS:
   - Faithfully recreate on-screen diagrams and generate clean Mermaid vector diagrams for complex multi-step workflows, lifecycles, and component architectures that were actually discussed (using \`graph TD\`, \`sequenceDiagram\`, or \`stateDiagram-v2\`).
-
+ 
 - RIGOROUS COMPARISON MATRICES:
   - Include multi-column comparative tables where the video actually compares approaches: (| Solution / Approach | Best Used When | Critical Trade-Offs | Complexity / Overhead | Common Pitfalls |).
-
+ 
 - ACTIVE RECALL & MASTERY SECTION:
   - Conclude the study guide with 3 to 5 challenging technical/system-design interview questions based specifically on the video's content, followed by clear, concise model solutions.`;
   } else {
@@ -110,12 +119,16 @@ DETAIL LEVEL: EXHAUSTIVE TECHNICAL MASTERCLASS (DEEP DIVE)
     coverBadge = "Full Lecture Notes • Study Guide";
     lengthAndDepthInstruction = `
 DETAIL LEVEL: STANDARD DETAILED NOTES
-- GOAL: Produce complete, thorough lecture notes capturing everything actually taught in the video from start to finish without omitting or inventing any topic or concept.
+- GOAL: Reproduce EXACTLY what is in the video — completely and in full detail, with nothing added and nothing removed.
+- HARD BOUNDARY (this is what makes Standard different from Deep Dive):
+  - Do NOT add your own extra explanation, extra depth, extra examples, extra pitfalls, extra trade-offs, or extra context that the speaker didn't actually cover. No "Beyond the Video" callouts in this tier — if it's not in the transcript, it doesn't belong in the notes.
+  - The only content allowed beyond a direct restatement of the transcript is: (a) standard, accurate definitions for terms the speaker uses but doesn't define, and (b) a "Technical Note / Correction" callout, and only when the speaker actually states something factually incorrect.
+  - Do not compress, summarize away, or shorten explanations for the sake of brevity — Standard is full-length and complete, not a summary.
 - APPROACH:
-  - Complete Video Coverage: Document every single topic, slide, whiteboard drawing, code snippet, and explanation actually present in the transcript, in chronological order.
-  - Structure: Numbered sections and subsections corresponding to every topic and concept the speaker actually covers.
-  - Content: Provide accurate definitions, recreate on-screen diagrams that are referenced, document all worked examples, and capture all code blocks discussed.
-  - Conclude with a Summary Cheat-Sheet built only from covered material.`;
+  - Complete Video Coverage: Document every single topic, slide, whiteboard drawing, code snippet, and explanation actually present in the transcript, in chronological order, with no gaps.
+  - Structure: Numbered sections and subsections corresponding to every topic and concept the speaker actually covers, in the order the video covers them.
+  - Content: Provide accurate definitions, recreate on-screen diagrams that are referenced, document all worked examples in full, and capture all code blocks discussed in full.
+  - Conclude with a Summary Cheat-Sheet built only from covered material — a recap of what's already in the notes, not new content.`;
   }
 
   let diagramInstruction = "";
@@ -137,29 +150,29 @@ DETAIL LEVEL: STANDARD DETAILED NOTES
   }
 
   return `You are generating structured, highly readable technical notes from a video lecture.
-
+ 
 GROUNDING & ANTI-HALLUCINATION RULES (highest priority — read first):
-- Your only source of truth is the transcript provided below (or, if none was provided, the notice explaining that). Every specific claim, fact, example, code snippet, number, or quote in your notes must trace back to something actually present in that source.
-- Do NOT invent plausible-sounding details (extra examples, extra code, extra statistics, extra diagrams) and present them as if the speaker said or showed them. If you add outside context to deepen an explanation, mark it clearly as such (see "Beyond the Video" callouts below) — never blend it in as if it were spoken content.
+- Your only source of truth is the transcript provided below. Every specific claim, fact, example, code snippet, number, or quote in your notes must trace back to something actually present in it.
+- Do NOT invent plausible-sounding details (extra examples, extra code, extra statistics, extra diagrams) and present them as if the speaker said or showed them.${settings.detailLevel === "deep_dive" ? ' If you add outside context to deepen an explanation (Deep Dive tier only), mark it clearly as such (see "Beyond the Video" callouts below) — never blend it in as if it were spoken content.' : " This detail level does not allow adding outside context at all — see the hard boundary below."}
 - If a section of the transcript is unclear, garbled, or ambiguous, say so plainly rather than guessing and presenting the guess as fact.
 - Tag each major numbered section with the timestamp(s) from the transcript it's drawn from, e.g. "## 2. Database Indexing [14:22]", so the notes stay traceable to a specific moment in the video.
 - Preserve the speaker's own terminology, examples, and code exactly as given rather than substituting your own generic versions.
-
+ 
 ${lengthAndDepthInstruction}
-
+ 
 CRITICAL NOTE-TAKING & ACCURACY RULES:
-
+ 
 1. FAITHFUL TO THE VIDEO CONTENT & FLOW:
    - Capture what was actually taught, written on screen (slides, whiteboard, diagrams, code), and explained by the speaker.
    - Follow the chronological sequence and topic progression of the video as given by the transcript order.
    - Do NOT replace the speaker's practical developer explanations with artificial, overly dense academic jargon. Keep the language natural, clear, and direct.
-
+ 
 2. ACCURATE DEFINITIONS & FACT CORRECTION:
    - Provide standard, technically accurate definitions for all concepts introduced in the video.
    - FACT CHECKING: If the speaker misstates a fact, makes a technical slip-up, or teaches an outdated/incorrect definition, state the correct standard fact in the notes and add a clear callout:
      > **Technical Note / Correction:** [Briefly clarify the accurate standard definition or industry best practice]
    - Only add a correction when the transcript actually contains the misstatement — don't invent slip-ups to fill space.
-
+ 
 3. VISUALS & ON-SCREEN DIAGRAMS (STRICT MERMAID RULES):
    ${diagramInstruction}
    - When diagrams appear on screen (e.g., flowcharts, architecture maps, sequence flows, state machines), recreate them faithfully using \`\`\`mermaid code blocks.
@@ -170,11 +183,11 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
      b. Use standard valid diagram headers only: \`graph TD\`, \`graph LR\`, \`sequenceDiagram\`, or \`stateDiagram-v2\`.
      c. Use simple alphanumeric IDs for nodes (e.g., \`client\`, \`srv1\`, \`db_cluster\`). NEVER use reserved words (\`end\`, \`node\`, \`graph\`, \`subgraph\`) as node IDs.
      d. In \`sequenceDiagram\`, wrap labels in quotes: \`Client->>Server: "POST /auth/login (JWT)"\`.
-
+ 
 4. CODE SNIPPETS & EXAMPLES:
    ${settings.includeCode ? "- Extract and format code snippets shown on screen exactly as given, using syntax-highlighted code blocks (```python, ```typescript, ```java, ```sql, etc.). If a snippet is incomplete in the transcript, mark it as incomplete rather than filling in the missing parts." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points, based only on what was actually explained."}
    ${examplesInstruction}
-
+ 
 5. MATH, FORMULAS & CODE FORMATTING RULES (STRICT LATEX RULES):
    ${settings.detailedMath ? "- Use LaTeX ($$ ... $$ for display math, $...$ for inline math) ONLY for pure mathematical equations, arithmetic proofs, probability, and Big-O asymptotic notation (e.g., $O(N \\log N)$, $T(n) = 2T(n/2) + O(n)$)." : "- Keep mathematical and complexity notations simple and inline."}
    - ABSOLUTE PROHIBITION: NEVER put SQL queries, database schema statements, API endpoints, variable names, or programming code inside LaTeX math ($$ or $). Format SQL/code strictly as inline backticks (\`SELECT * FROM ...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`).
@@ -182,9 +195,9 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
      a. In LaTeX math, all literal underscores must be escaped as \\_ (e.g. \$\\text{max\\_connections}\$).
      b. In LaTeX math, percent signs must be escaped as \\% (e.g. \$99.9\\%\$ availability).
      c. For regular currency in prose, write "50 USD" or "\\$50" to avoid accidentally triggering math mode.
-
+ 
 ${customInstruction ? `6. USER CUSTOM FOCUS:\n${customInstruction}` : ""}
-
+ 
 DOCUMENT STRUCTURE & FORMATTING:
 - OUTPUT FORMAT: Return clean GitHub-Flavored Markdown (GFM) only. Do NOT wrap the entire response in a top-level code block.
 - NO EMOJIS: Use clean typographic symbols only: ✓ for yes/recommended, ✗ for no/avoid, and → for flow arrows.
@@ -206,7 +219,7 @@ DOCUMENT STRUCTURE & FORMATTING:
   > **Beyond the Video:** [Use only for context you've added that goes beyond what was actually said/shown]
 - COMPARISON TABLES: Clean Markdown tables (| Feature / Option | When to Use | Advantages | Limitations |), populated only with comparisons the video actually makes.
 - SUMMARY CHEAT-SHEET: Conclude with a summary section containing a quick reference table and key takeaways drawn only from covered material.
-
+ 
 ${transcriptSection}
 `;
 }
