@@ -76,9 +76,10 @@ export const SidePanelPage: React.FC = () => {
           window.removeEventListener('message', msgHandler);
           resolve(undefined);
         }
-      }, 1200);
+      }, 5000);
     });
   };
+
 
   const handleOpenFullTab = async (streamInTab = false) => {
     const studioBase = env.webStudioUrl.replace(/\/+$/, '');

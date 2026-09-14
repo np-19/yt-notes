@@ -3,7 +3,7 @@
   let panelIframe = null;
   let isPanelOpen = false;
   let pollInterval = null;
-  let lastCachedVideoId = null; // avoid re-fetching same video
+  let lastCachedVideoId = null;
 
   const isExtensionValid = () => {
     try {
@@ -25,34 +25,63 @@
      .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
      .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)));
 
-  const parseXml = (xml, lang = "en") => {
-    // Format 1: new YouTube XML → <p t="offsetMs" d="durMs"><s>word</s></p>
+  const parseTranscriptResponse = (text, lang = "en") => {
+    if (!text || typeof text !== "string") return [];
+
+    // 1. JSON3 format (used by modern YouTube player endpoints)
+    try {
+      const data = JSON.parse(text);
+      if (Array.isArray(data?.events)) {
+        const results = [];
+        for (const ev of data.events) {
+          if (!ev.segs || !Array.isArray(ev.segs)) continue;
+          const line = ev.segs
+            .map((s) => s?.utf8 || "")
+            .join("")
+            .replace(/\n/g, " ")
+            .trim();
+          if (line) {
+            results.push({
+              text: line,
+              offset: Number(ev.tStartMs ?? 0),
+              duration: Number(ev.dDurationMs ?? 0),
+              lang,
+            });
+          }
+        }
+        if (results.length > 0) return results;
+      }
+    } catch {}
+
+    // 2. Format 1: new YouTube XML → <p t="offsetMs" d="durMs"><s>word</s></p>
     const newResults = [];
     let m;
     const pRe = /<p\s+[^>]*\bt="(\d+)"[^>]*\bd="(\d+)"[^>]*>([\s\S]*?)<\/p>/gi;
-    while ((m = pRe.exec(xml)) !== null) {
+    while ((m = pRe.exec(text)) !== null) {
       const inner = m[3];
-      let text = "";
+      let line = "";
       const sRe = /<s[^>]*>([^<]*)<\/s>/gi;
       let sm;
-      while ((sm = sRe.exec(inner)) !== null) text += sm[1];
-      if (!text) text = inner.replace(/<[^>]+>/g, "");
-      text = decodeEntities(text).trim();
-      if (text) newResults.push({ text, offset: parseInt(m[1], 10), duration: parseInt(m[2], 10), lang });
+      while ((sm = sRe.exec(inner)) !== null) line += sm[1];
+      if (!line) line = inner.replace(/<[^>]+>/g, "");
+      line = decodeEntities(line).replace(/\n/g, " ").trim();
+      if (line) newResults.push({ text: line, offset: parseInt(m[1], 10), duration: parseInt(m[2], 10), lang });
     }
     if (newResults.length > 0) return newResults;
 
-    // Format 2: classic XML → <text start="s" dur="s">text</text>
+    // 3. Format 2: classic XML → <text start="s" dur="s">text</text>
     const classicResults = [];
-    const cRe = /<text\s+start="([^"]*)"\s+dur="([^"]*)"[^>]*>([^<]*)<\/text>/gi;
-    while ((m = cRe.exec(xml)) !== null) {
-      const text = decodeEntities(m[3]).trim();
-      if (text) classicResults.push({
-        text,
-        offset: Math.round(parseFloat(m[1]) * 1000),
-        duration: Math.round(parseFloat(m[2]) * 1000),
-        lang,
-      });
+    const cRe = /<text\s+start="([\d.]+)"(?:\s+dur="([\d.]+)")?[^>]*>([^<]*)<\/text>/gi;
+    while ((m = cRe.exec(text)) !== null) {
+      const line = decodeEntities(m[3]).replace(/\n/g, " ").trim();
+      if (line) {
+        classicResults.push({
+          text: line,
+          offset: Math.round(parseFloat(m[1]) * 1000),
+          duration: Math.round(parseFloat(m[2] || "0") * 1000),
+          lang,
+        });
+      }
     }
     return classicResults;
   };
@@ -72,41 +101,60 @@
       window.postMessage({ type: "GET_YT_CAPTIONS_TRACK", videoId }, "*");
       setTimeout(() => {
         if (!done) { window.removeEventListener("message", handler); resolve([]); }
-      }, 3000);
+      }, 4000);
     });
 
   // Fetch transcript from YouTube and cache in chrome.storage
   const fetchAndCacheTranscript = async (videoId) => {
-    if (!isExtensionValid() || !chrome.storage?.local) return;
-    if (lastCachedVideoId === videoId) return; // already done this session
+    if (!isExtensionValid() || !chrome.storage?.local) return [];
+    if (lastCachedVideoId === videoId) {
+      const stored = await chrome.storage.local.get([`transcript_${videoId}`]);
+      if (Array.isArray(stored[`transcript_${videoId}`])) return stored[`transcript_${videoId}`];
+    }
     lastCachedVideoId = videoId;
 
     try {
       const tracks = await getCapTracks(videoId);
-      if (!tracks || tracks.length === 0) return;
+      if (!tracks || tracks.length === 0) return [];
 
       const chosen =
-        tracks.find((t) => t.languageCode === "en" || t.vssId?.includes(".en")) ||
+        tracks.find((t) => t.languageCode === "en" || t.vssId?.includes(".en") || t.languageCode?.startsWith("en")) ||
         tracks[0];
-      if (!chosen?.baseUrl) return;
+      if (!chosen?.baseUrl) return [];
 
-      const res = await fetch(chosen.baseUrl);
-      if (!res.ok) return;
+      const urlsToTry = [
+        chosen.baseUrl.includes("&fmt=") ? chosen.baseUrl : (chosen.baseUrl + "&fmt=json3"),
+        chosen.baseUrl,
+        chosen.baseUrl + "&fmt=srv1",
+      ];
 
-      const xml = await res.text();
-      const transcript = parseXml(xml, chosen.languageCode || "en");
-      if (transcript.length === 0) return;
+      let transcript = [];
+      for (const url of urlsToTry) {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) continue;
+          const bodyText = await res.text();
+          if (!bodyText || bodyText.length === 0) continue;
+          transcript = parseTranscriptResponse(bodyText, chosen.languageCode || "en");
+          if (transcript.length > 0) break;
+        } catch {}
+      }
 
-      // Store so the panel + web app (via storage API) can read it
-      chrome.storage.local.set({ [`transcript_${videoId}`]: transcript });
+      if (transcript.length === 0) return [];
 
-      // Immediately notify the iframe if it's waiting
+      // Store in chrome.storage.local
+      await chrome.storage.local.set({ [`transcript_${videoId}`]: transcript });
+
+      // Notify the panel iframe
       panelIframe?.contentWindow?.postMessage(
         { type: "CLIENT_TRANSCRIPT_RESULT", videoId, transcript },
         "*"
       );
+
+      return transcript;
     } catch (e) {
-      // ignore — backend will try its own strategies
+      console.warn("[LectureNotes] Failed to fetch transcript:", e);
+      return [];
     }
   };
 
@@ -188,7 +236,6 @@
   };
 
   // ── Global message handler ─────────────────────────────────────────────────
-  // Single top-level listener — avoids duplicates from createSidePanel calls
 
   window.addEventListener("message", async (event) => {
     const { type, videoId: vId } = event.data || {};
@@ -207,7 +254,7 @@
           "*"
         );
 
-      // 1. Check chrome.storage cache first (fastest)
+      // 1. Check chrome.storage cache first
       try {
         const stored = await chrome.storage.local.get([`transcript_${vId}`]);
         const cached = stored[`transcript_${vId}`];
@@ -217,18 +264,10 @@
         }
       } catch (e) {}
 
-      // 2. Not cached yet — fetch it now (fetchAndCacheTranscript will reply via postMessage when done)
-      lastCachedVideoId = null; // reset so fetch runs even if called before
-      await fetchAndCacheTranscript(vId);
-
-      // 3. If still nothing, reply with empty so the panel doesn't hang
-      try {
-        const stored = await chrome.storage.local.get([`transcript_${vId}`]);
-        const cached = stored[`transcript_${vId}`];
-        reply(Array.isArray(cached) ? cached : []);
-      } catch (e) {
-        reply([]);
-      }
+      // 2. Fetch directly from active video
+      lastCachedVideoId = null;
+      const fetched = await fetchAndCacheTranscript(vId);
+      reply(Array.isArray(fetched) ? fetched : []);
     }
   });
 
@@ -257,7 +296,7 @@
       if (chrome.storage?.local) chrome.storage.local.set({ currentVideo });
     } catch (e) {}
 
-    // Proactively capture + cache transcript while user is on the page
+    // Proactively capture + cache transcript
     fetchAndCacheTranscript(id);
 
     createSidePanel();
