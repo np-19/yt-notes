@@ -1,6 +1,33 @@
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "../services/yt.transcript.js";
 
+export function buildTranscriptPrompt(videoId: string, videoTitle?: string, videoAuthor?: string): string {
+  const metadataLines = [
+    `YouTube Video ID: "${videoId}"`,
+    videoTitle ? `Video Title: "${videoTitle}"` : null,
+    videoAuthor ? `Channel / Creator: "${videoAuthor}"` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return `You are an expert YouTube video transcription engine.
+${metadataLines}
+
+Tasks:
+1. Generate the COMPLETE, chronological, word-for-word transcript of everything spoken in this entire video from start to finish.
+2. Cover the complete duration without summarizing or cutting off early.
+3. Group spoken sentences into clear paragraph segments (~30-60s each) with millisecond offsets (e.g., 0, 30000, 60000, ...).
+
+Output STRICTLY as raw JSON, no markdown fences:
+{
+  "title": "${videoTitle || "exact video title"}",
+  "author": "${videoAuthor || "exact channel name"}",
+  "hasSubtitles": true,
+  "transcript": [
+    { "text": "Segment of spoken content covering this time interval...", "offset": 0 }
+  ]
+}`;
+}
 
 export function buildNotesPrompt(
   videoId: string,

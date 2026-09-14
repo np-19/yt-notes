@@ -45,7 +45,7 @@ async function prepareSynthesisContext(body: NotePayload) {
 
   if (transcript.length === 0) {
     throw new ExpressError(
-      "Could not retrieve transcript for this YouTube video. Please ensure the video has subtitles/transcripts enabled and that your YOUTUBE_TRANSCRIPT_API_KEYS are configured with active credits.",
+      "Could not retrieve or generate transcript for this YouTube video. Please ensure the video is accessible and try again.",
       400
     );
   }

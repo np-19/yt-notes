@@ -10,13 +10,3 @@ export const AllowedFrontendOrigins = (process.env.FRONTEND_URL || "http://local
 export const GeminiApiKey = process.env.GEMINI_API_KEY ?? "";
 export const GeminiModel = process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
 
-const rawTranscriptKeys =
-  process.env.YOUTUBE_TRANSCRIPT_API_KEYS ||
-  process.env.YOUTUBE_TRANSCRIPT_API_KEY ||
-  "";
-
-export const YouTubeTranscriptApiKeys: string[] = rawTranscriptKeys
-  .split(",")
-  .map((k) => k.trim())
-  .filter(Boolean);
-
