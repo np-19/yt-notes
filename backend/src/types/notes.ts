@@ -9,3 +9,8 @@ export type NoteSettings = {
   includeCode: boolean;
   detailedMath: boolean;
 };
+
+export type TranscriptEntry = {
+  text: string;
+  offset: number; // milliseconds
+};

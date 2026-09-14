@@ -1,33 +1,4 @@
-import type { NoteSettings } from "../types/notes.js";
-import type { TranscriptEntry } from "../services/yt.transcript.js";
-
-export function buildTranscriptPrompt(videoId: string, videoTitle?: string, videoAuthor?: string): string {
-  const metadataLines = [
-    `YouTube Video ID: "${videoId}"`,
-    videoTitle ? `Video Title: "${videoTitle}"` : null,
-    videoAuthor ? `Channel / Creator: "${videoAuthor}"` : null,
-  ]
-    .filter(Boolean)
-    .join("\n");
-
-  return `You are an expert YouTube video transcription engine.
-${metadataLines}
-
-Tasks:
-1. Generate the COMPLETE, chronological, word-for-word transcript of everything spoken in this entire video from start to finish.
-2. Cover the complete duration without summarizing or cutting off early.
-3. Group spoken sentences into clear paragraph segments (~30-60s each) with millisecond offsets (e.g., 0, 30000, 60000, ...).
-
-Output STRICTLY as raw JSON, no markdown fences:
-{
-  "title": "${videoTitle || "exact video title"}",
-  "author": "${videoAuthor || "exact channel name"}",
-  "hasSubtitles": true,
-  "transcript": [
-    { "text": "Segment of spoken content covering this time interval...", "offset": 0 }
-  ]
-}`;
-}
+import type { NoteSettings, TranscriptEntry } from "../types/notes.js";
 
 export function buildNotesPrompt(
   videoId: string,
@@ -53,9 +24,14 @@ export function buildNotesPrompt(
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const transcriptSection = `Timestamped Transcript (this is the ONLY source of truth for what was taught — do not add facts, examples, code, or claims that aren't grounded in it):\n${transcript
-    .map((entry) => `[${formatOffset(entry.offset)}] ${entry.text}`)
-    .join("\n")}`;
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const hasTranscript = Array.isArray(transcript) && transcript.length > 0;
+
+  const transcriptSection = hasTranscript
+    ? `Timestamped Transcript (this is the ONLY source of truth for what was taught — do not add facts, examples, code, or claims that aren't grounded in it):\n${transcript
+        .map((entry) => `[${formatOffset(entry.offset)}] ${entry.text}`)
+        .join("\n")}`
+    : `YouTube Video Source: ${watchUrl}\n(Synthesize and ground all notes, code, formulas, and structural diagrams directly from this lecture video: ${watchUrl})`;
 
   const customInstruction = settings.customPrompt?.trim()
     ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`

@@ -2,8 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { GeminiApiKey, GeminiModel } from "../configs/constants.js";
 import { buildNotesPrompt, buildEditPrompt } from "../configs/prompts.js";
 import { ExpressError } from "../utils/expressError.js";
-import type { NoteSettings } from "../types/notes.js";
-import type { TranscriptEntry } from "./yt.transcript.js";
+import type { NoteSettings, TranscriptEntry } from "../types/notes.js";
 
 export const SUPPORTED_MODELS = [
   GeminiModel || "gemini-3.6-flash",
@@ -50,10 +49,6 @@ export async function generateNotes(
   transcript: TranscriptEntry[],
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
 ): Promise<string> {
-  if (!transcript || transcript.length === 0) {
-    throw new ExpressError("Transcript unavailable for this video — captions may be disabled or the video may be restricted.", 400);
-  }
-
   const prompt = buildNotesPrompt(videoId, transcript, settings);
 
   return executeWithModelFallback("generateNotes", async (ai, modelName) => {
@@ -72,10 +67,6 @@ export async function generateNotesStream(
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined },
   onChunk: (chunkText: string) => void
 ): Promise<string> {
-  if (!transcript || transcript.length === 0) {
-    throw new ExpressError("Transcript unavailable for this video — captions may be disabled or the video may be restricted.", 400);
-  }
-
   const prompt = buildNotesPrompt(videoId, transcript, settings);
 
   return executeWithModelFallback("generateNotesStream", async (ai, modelName) => {

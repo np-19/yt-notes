@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { z } from "zod";
-import { fetchOEmbedDetails, getVideoDetailsAndTranscript } from "../services/yt.transcript.js";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
 import { ExpressError } from "../utils/expressError.js";
@@ -17,7 +16,7 @@ const settings = z.object({
 });
 
 const transcriptEntrySchema = z.object({
-  text: z.string(),
+  text: z.string().min(1, "Transcript text entry cannot be empty"),
   offset: z.number().optional().default(0),
 });
 
@@ -25,52 +24,14 @@ const notePayloadSchema = settings.extend({
   videoId,
   videoTitle: z.string().trim().min(1).max(300).optional(),
   customPrompt: z.string().max(2000).optional(),
-  transcript: z.array(transcriptEntrySchema).optional(),
+  transcript: z
+    .array(transcriptEntrySchema)
+    .min(1, "Cannot generate notes: Transcript is not available for this video."),
 });
 
 type NotePayload = z.infer<typeof notePayloadSchema>;
 
-async function prepareSynthesisContext(body: NotePayload) {
-  let transcript = body.transcript || [];
-  let resolvedTitle = body.videoTitle?.trim();
-
-  // If transcript was not supplied by client extension, fetch/generate it via Gemini
-  if (transcript.length === 0) {
-    const details = await getVideoDetailsAndTranscript(body.videoId);
-    transcript = details.transcript;
-    if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
-      resolvedTitle = details.title;
-    }
-  }
-
-  if (transcript.length === 0) {
-    throw new ExpressError(
-      "Transcript unavailable for this video — captions may be disabled or the video may be restricted.",
-      400
-    );
-  }
-
-  const isGenericTitle =
-    !resolvedTitle ||
-    resolvedTitle === "Synthesized Academic Notes" ||
-    resolvedTitle.startsWith("Lecture Notes —") ||
-    resolvedTitle.startsWith("Technical Lecture (") ||
-    resolvedTitle.startsWith("YouTube Lecture (");
-
-  if (isGenericTitle) {
-    const oembed = await fetchOEmbedDetails(body.videoId);
-    if (oembed.title) {
-      resolvedTitle = oembed.title;
-    }
-  }
-
-  return {
-    transcript,
-    resolvedTitle: resolvedTitle || `Lecture Notes — ${body.videoId}`,
-  };
-}
-
-function resolveDocumentTitle(markdown: string, fallbackTitle: string): string {
+function resolveDocumentTitle(markdown: string, fallbackTitle?: string): string {
   const match =
     markdown.match(/<header[^>]*class=["']note-cover["'][^>]*>[\s\S]*?<h1>([\s\S]*?)<\/h1>/i) ||
     markdown.match(/^#\s+([^\n]+)/m);
@@ -80,9 +41,9 @@ function resolveDocumentTitle(markdown: string, fallbackTitle: string): string {
 router.post("/", async (req, res, next) => {
   try {
     const body = notePayloadSchema.parse(req.body);
-    const { transcript, resolvedTitle } = await prepareSynthesisContext(body);
+    const resolvedTitle = body.videoTitle?.trim() || `Lecture Notes — ${body.videoId}`;
 
-    const markdown = await generateNotes(body.videoId, transcript, {
+    const markdown = await generateNotes(body.videoId, body.transcript, {
       ...body,
       videoTitle: resolvedTitle,
     });
@@ -106,8 +67,20 @@ router.post("/", async (req, res, next) => {
 
 router.post("/stream", async (req, res) => {
   try {
-    const body = notePayloadSchema.parse(req.body);
-    const { transcript, resolvedTitle } = await prepareSynthesisContext(body);
+    const parseResult = notePayloadSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0]?.message || "Invalid request payload";
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders?.();
+      res.write(`data: ${JSON.stringify({ type: "error", message: issue })}\n\n`);
+      res.end();
+      return;
+    }
+
+    const body = parseResult.data;
+    const resolvedTitle = body.videoTitle?.trim() || `Lecture Notes — ${body.videoId}`;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -116,7 +89,7 @@ router.post("/stream", async (req, res) => {
 
     const fullMarkdown = await generateNotesStream(
       body.videoId,
-      transcript,
+      body.transcript,
       { ...body, videoTitle: resolvedTitle },
       (chunk) => {
         res.write(`data: ${JSON.stringify({ type: "chunk", text: chunk })}\n\n`);
@@ -145,16 +118,6 @@ router.post("/edit", async (req, res, next) => {
 
     const updated = await editNotes(body.html, body.instruction, body.selection ?? undefined);
     res.json({ success: true, data: { html: updated } });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post("/transcript", async (req, res, next) => {
-  try {
-    const id = videoId.parse(req.body.videoId);
-    const details = await getVideoDetailsAndTranscript(id);
-    res.json({ success: true, data: details });
   } catch (error) {
     next(error);
   }
