@@ -183,7 +183,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     if (selectedChunks.length === 0) return;
 
-    // 2. Multi-node text matching and wrapping for each pinned chunk
+    // 2. Whitespace-normalized multi-node text matching and wrapping for each pinned chunk
     selectedChunks.forEach((chunk) => {
       const fullText = chunk.trim();
       if (!fullText || fullText.length < 2) return;
@@ -230,16 +230,46 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           textNodes.push({ node: currentNode, start, end: fullDocText.length, text: val });
         }
 
-        // Search for targetText in fullDocText
-        let matchIdx = fullDocText.indexOf(targetText);
-        if (matchIdx === -1) {
-          matchIdx = fullDocText.toLowerCase().indexOf(targetText.toLowerCase());
+        if (fullDocText.length === 0) return;
+
+        // Build normalized doc string and character position map
+        let normDoc = '';
+        const indexMap: number[] = [];
+        let inWs = false;
+
+        for (let i = 0; i < fullDocText.length; i++) {
+          const ch = fullDocText[i];
+          const isWs = /\s/.test(ch);
+          if (isWs) {
+            if (!inWs) {
+              normDoc += ' ';
+              indexMap.push(i);
+              inWs = true;
+            }
+          } else {
+            normDoc += ch.toLowerCase();
+            indexMap.push(i);
+            inWs = false;
+          }
         }
 
-        if (matchIdx !== -1) {
-          const matchEnd = matchIdx + targetText.length;
+        const normTarget = targetText.replace(/\s+/g, ' ').trim().toLowerCase();
+        if (!normTarget || normTarget.length === 0) return;
+
+        let searchPos = 0;
+        while (searchPos < normDoc.length) {
+          const matchIdx = normDoc.indexOf(normTarget, searchPos);
+          if (matchIdx === -1) break;
+
+          const rawStart = indexMap[matchIdx];
+          const endNormIdx = matchIdx + normTarget.length - 1;
+          const rawEnd =
+            endNormIdx < indexMap.length
+              ? indexMap[endNormIdx] + 1
+              : fullDocText.length;
+
           const overlappingNodes = textNodes.filter(
-            (tn) => tn.start < matchEnd && tn.end > matchIdx
+            (tn) => tn.start < rawEnd && tn.end > rawStart
           );
 
           // Wrap overlapping portions from right to left
@@ -248,8 +278,8 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               const { node, start } = overlappingNodes[i];
               const nodeText = node.nodeValue || '';
 
-              const sliceStart = Math.max(0, matchIdx - start);
-              const sliceEnd = Math.min(nodeText.length, matchEnd - start);
+              const sliceStart = Math.max(0, rawStart - start);
+              const sliceEnd = Math.min(nodeText.length, rawEnd - start);
 
               if (sliceStart >= sliceEnd) continue;
 
@@ -276,6 +306,9 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
               console.warn('Failed to wrap pinned mark:', err);
             }
           }
+
+          // Advance search position
+          searchPos = matchIdx + normTarget.length;
         }
       });
     });

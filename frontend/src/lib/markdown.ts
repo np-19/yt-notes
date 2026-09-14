@@ -33,7 +33,14 @@ export function repairMermaidDiagram(source: string): string {
   // 2. Strip code fences if present
   diagram = diagram.replace(/^```(?:mermaid)?\s*/i, '').replace(/```\s*$/i, '').trim();
 
-  // 3. Ensure valid diagram header
+  // 3. Fix invalid arrow syntax like <=> or <->
+  diagram = diagram.replace(/<=>/g, '<-->').replace(/(?<!-)<->(?!-)/g, '<-->');
+
+  // 4. If statements are concatenated on a single line, format them into lines
+  diagram = diagram.replace(/\s+(subgraph\b)/gi, '\n$1');
+  diagram = diagram.replace(/\s+(end)(?=\s|$)/gi, '\nend\n');
+
+  // 5. Ensure valid diagram header
   const headerMatch = diagram.match(/^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|gantt|pie|gitGraph|mindmap|quadrantChart|journey|sankey-beta)\b/i);
   if (!headerMatch) {
     diagram = `graph TD\n${diagram}`;
@@ -41,7 +48,7 @@ export function repairMermaidDiagram(source: string): string {
     diagram = diagram.replace(/^(graph|flowchart)\s+([a-z]{2})\b/i, (_, type, dir) => `${type} ${dir.toUpperCase()}`);
   }
 
-  // 4. Fix reserved keywords and auto-quote labels
+  // 6. Fix reserved keywords and auto-quote labels
   const reservedWords = ['end', 'node', 'graph', 'subgraph', 'linkStyle', 'style', 'class', 'default', 'click', 'callback'];
   const lines = diagram.split('\n');
   let openSubgraphs = 0;
@@ -50,20 +57,18 @@ export function repairMermaidDiagram(source: string): string {
     let l = line;
     const trimmed = l.trim();
 
-    if (/^subgraph\s+/i.test(trimmed)) {
+    if (!trimmed) return "";
+
+    if (/^subgraph\b/i.test(trimmed)) {
       openSubgraphs++;
-      const sgMatch = trimmed.match(/^subgraph\s+([A-Za-z0-9_]+)?\s*\[?"?([^"\]\n]+)"?\]?/i);
-      if (sgMatch) {
-        const id = sgMatch[1] || `sg_${Math.random().toString(36).substring(2, 6)}`;
-        const title = sgMatch[2] || id;
-        return `  subgraph ${id} ["${title.replace(/"/g, "'")}"]`;
-      }
-      return l;
+      const title = trimmed.replace(/^subgraph\s+/i, '').replace(/^\[?"?|"?\]?$/g, '').trim();
+      const safeId = title.replace(/[^A-Za-z0-9_]/g, '_').toLowerCase().substring(0, 30) || `sg_${Math.random().toString(36).substring(2, 6)}`;
+      return `  subgraph ${safeId} ["${title.replace(/"/g, "'")}"]`;
     }
 
     if (trimmed === 'end') {
       openSubgraphs = Math.max(0, openSubgraphs - 1);
-      return l;
+      return '  end';
     }
 
     if (trimmed.startsWith('%%') || /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram)/i.test(trimmed)) {
@@ -72,8 +77,8 @@ export function repairMermaidDiagram(source: string): string {
 
     // Replace reserved words used as node IDs
     reservedWords.forEach((word) => {
-      l = l.replace(new RegExp(`(^|\\s)(${word})(?=\\s*(\\[|\\(|\\{|\\>|---|-->|-\\.-|==>))`, 'g'), `$1${word}_node`);
-      l = l.replace(new RegExp(`(-->|---|-.->|==>|\\|[^\\|]+\\|\\s*)(${word})(?=\\s*(\\[|\\(|\\{|\\s|$))`, 'g'), `$1$2_node`);
+      l = l.replace(new RegExp(`(^|\\s)(${word})(?=\\s*(\\[|\\(|\\{|\\>|---|-->|<-->|-\\.-|==>))`, 'g'), `$1${word}_node`);
+      l = l.replace(new RegExp(`(-->|<-->|---|-.->|==>|\\|[^\\|]+\\|\\s*)(${word})(?=\\s*(\\[|\\(|\\{|\\s|$))`, 'g'), `$1$2_node`);
     });
 
     // Auto-quote all Mermaid node shapes:
@@ -112,11 +117,11 @@ export function repairMermaidDiagram(source: string): string {
   });
 
   while (openSubgraphs > 0) {
-    fixedLines.push('end');
+    fixedLines.push('  end');
     openSubgraphs--;
   }
 
-  return fixedLines.join('\n');
+  return fixedLines.filter(Boolean).join('\n');
 }
 
 export function healMarkdownDefects(markdown: string): string {
