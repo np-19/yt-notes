@@ -48,6 +48,33 @@ export function healMarkdownDefects(markdown: string): string {
   // 4. Strip unwanted horizontal dividing lines (---, ***, ___)
   text = text.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '');
 
+  // 5. Auto-repair LaTeX equation defects (unescaped underscores inside \text{}, unescaped %, missing subscript markers)
+  // Repair display math $$ ... $$
+  text = text.replace(/\$\$([\s\S]*?)\$\$/g, (_match, mathContent) => {
+    let repaired = mathContent;
+    // Replace unescaped underscores inside \text{...}, \mathrm{...}, \mathbf{...}, \mathit{...}
+    repaired = repaired.replace(/\\(text|mathrm|mathbf|mathit)\{([^{}]+)\}/g, (_m: string, cmd: string, inner: string) => {
+      return `\\${cmd}{${inner.replace(/(?<!\\)_/g, '\\_')}}`;
+    });
+    // Replace isolated unescaped percent signs (e.g., 99.9% -> 99.9\%)
+    repaired = repaired.replace(/(\d+(?:\.\d+)?)\s*%(?!\w)/g, '$1\\%');
+    // Fix missing subscript operator before text block, e.g., \text{QPS} {\text{read_peak}} -> \text{QPS}_{\text{read\_peak}}
+    repaired = repaired.replace(/(\\text\{[^{}]+\})\s+(\{\\text\{[^{}]+\})/g, '$1_$2');
+    return `$$${repaired}$$`;
+  });
+
+  // Repair inline math $ ... $
+  text = text.replace(/(?<!\\)\$([^\$\n]+?)(?<!\\)\$/g, (_match, mathContent) => {
+    let repaired = mathContent;
+    // Replace unescaped underscores inside \text{...}, \mathrm{...}
+    repaired = repaired.replace(/\\(text|mathrm|mathbf|mathit)\{([^{}]+)\}/g, (_m: string, cmd: string, inner: string) => {
+      return `\\${cmd}{${inner.replace(/(?<!\\)_/g, '\\_')}}`;
+    });
+    // Replace isolated unescaped percent signs
+    repaired = repaired.replace(/(\d+(?:\.\d+)?)\s*%(?!\w)/g, '$1\\%');
+    return `$${repaired}$`;
+  });
+
   return text;
 }
 

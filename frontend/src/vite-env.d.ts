@@ -5,9 +5,10 @@ declare module 'katex/dist/contrib/auto-render.mjs' {
     delimiters?: Array<{ left: string; right: string; display: boolean }>;
     ignoredTags?: string[];
     ignoredClasses?: string[];
+    throwOnError?: boolean;
+    strict?: boolean | string;
     errorCallback?: (msg: string, err: Error) => void;
     preProcess?: (math: string) => string;
-    throwOnError?: boolean;
   }
   function renderMathInElement(elem: HTMLElement, options?: AutoRenderOptions): void;
   export default renderMathInElement;

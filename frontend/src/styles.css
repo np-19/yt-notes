@@ -1245,13 +1245,13 @@ footer {
 
 /* Pinned Note Multi-Chunk Selection Highlights */
 mark.pinned-note-highlight {
-  background-color: rgba(249, 115, 22, 0.25) !important;
-  border-bottom: 2px solid #f97316 !important;
+  background-color: #fed7aa !important; /* light warm orange */
+  border-bottom: 2px solid #ea580c !important;
   border-radius: 4px;
-  padding: 1px 3px;
-  color: inherit !important;
+  padding: 1px 4px;
+  color: #7c2d12 !important;
   font-weight: inherit !important;
   transition: all 0.2s ease;
-  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 0 0 1px rgba(234, 88, 12, 0.3);
 }
 

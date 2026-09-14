@@ -183,16 +183,20 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
 
     if (selectedChunks.length === 0) return;
 
-    // 2. Wrap text node matches for each pinned chunk
+    // 2. Multi-node text matching and wrapping for each pinned chunk
     selectedChunks.forEach((chunk) => {
       const fullText = chunk.trim();
       if (!fullText || fullText.length < 2) return;
 
-      // Match multi-line or long selections by segments
-      const segments = fullText.split(/\n+/).map((s) => s.trim()).filter((s) => s.length >= 2);
+      // Break chunk into segments if multi-line
+      const segments = fullText
+        .split(/\n+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 2);
       const targets = segments.length > 0 ? segments : [fullText];
 
       targets.forEach((targetText) => {
+        // Collect all valid text nodes in document order
         const walker = document.createTreeWalker(
           container,
           NodeFilter.SHOW_TEXT,
@@ -215,53 +219,68 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           }
         );
 
-        const replacements: { node: Text; idx: number; len: number }[] = [];
+        const textNodes: { node: Text; start: number; end: number; text: string }[] = [];
+        let fullDocText = '';
         let currentNode: Text | null;
 
         while ((currentNode = walker.nextNode() as Text | null)) {
-          const textVal = currentNode.nodeValue || '';
-          const idx = textVal.indexOf(targetText);
-          if (idx !== -1) {
-            replacements.push({ node: currentNode, idx, len: targetText.length });
-          }
+          const val = currentNode.nodeValue || '';
+          const start = fullDocText.length;
+          fullDocText += val;
+          textNodes.push({ node: currentNode, start, end: fullDocText.length, text: val });
         }
 
-        replacements.forEach(({ node, idx, len }) => {
-          try {
-            const textVal = node.nodeValue || '';
-            const before = textVal.substring(0, idx);
-            const match = textVal.substring(idx, idx + len);
-            const after = textVal.substring(idx + len);
+        // Search for targetText in fullDocText
+        let matchIdx = fullDocText.indexOf(targetText);
+        if (matchIdx === -1) {
+          matchIdx = fullDocText.toLowerCase().indexOf(targetText.toLowerCase());
+        }
 
-            const mark = document.createElement('mark');
-            mark.className = 'pinned-note-highlight';
-            mark.style.backgroundColor = 'rgba(249, 115, 22, 0.25)';
-            mark.style.borderBottom = '2px solid #f97316';
-            mark.style.borderRadius = '3px';
-            mark.style.padding = '1px 3px';
-            mark.style.color = 'inherit';
-            mark.style.fontWeight = 'inherit';
-            mark.textContent = match;
+        if (matchIdx !== -1) {
+          const matchEnd = matchIdx + targetText.length;
+          const overlappingNodes = textNodes.filter(
+            (tn) => tn.start < matchEnd && tn.end > matchIdx
+          );
 
-            const parent = node.parentNode;
-            if (!parent) return;
+          // Wrap overlapping portions from right to left
+          for (let i = overlappingNodes.length - 1; i >= 0; i--) {
+            try {
+              const { node, start } = overlappingNodes[i];
+              const nodeText = node.nodeValue || '';
 
-            if (before) {
-              parent.insertBefore(document.createTextNode(before), node);
+              const sliceStart = Math.max(0, matchIdx - start);
+              const sliceEnd = Math.min(nodeText.length, matchEnd - start);
+
+              if (sliceStart >= sliceEnd) continue;
+
+              const before = nodeText.substring(0, sliceStart);
+              const match = nodeText.substring(sliceStart, sliceEnd);
+              const after = nodeText.substring(sliceEnd);
+
+              const mark = document.createElement('mark');
+              mark.className = 'pinned-note-highlight';
+              mark.textContent = match;
+
+              const parent = node.parentNode;
+              if (!parent) continue;
+
+              if (before) {
+                parent.insertBefore(document.createTextNode(before), node);
+              }
+              parent.insertBefore(mark, node);
+              if (after) {
+                parent.insertBefore(document.createTextNode(after), node);
+              }
+              parent.removeChild(node);
+            } catch (err) {
+              console.warn('Failed to wrap pinned mark:', err);
             }
-            parent.insertBefore(mark, node);
-            if (after) {
-              parent.insertBefore(document.createTextNode(after), node);
-            }
-            parent.removeChild(node);
-          } catch (err) {
-            console.warn('Failed to highlight text node:', err);
           }
-        });
-
-        container.normalize();
+        }
       });
     });
+
+    container.normalize();
   }, [selectedChunks, editableHtml, isStreaming]);
 
   // Handle Mouse Text Selection
@@ -320,6 +339,15 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
             { left: '\\[', right: '\\]', display: true },
           ],
           throwOnError: false,
+          strict: 'ignore',
+          preProcess: (math: string) => {
+            return math
+              .replace(/\\(text|mathrm|mathbf|mathit)\{([^{}]+)\}/g, (_m: string, cmd: string, inner: string) => {
+                return `\\${cmd}{${inner.replace(/(?<!\\)_/g, '\\_')}}`;
+              })
+              .replace(/(\d+(?:\.\d+)?)\s*%(?!\w)/g, '$1\\%')
+              .replace(/(\\text\{[^{}]+\})\s+(\{\\text\{[^{}]+\})/g, '$1_$2');
+          },
           ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
           ignoredClasses: ['katex', 'no-mathjax'],
         });
@@ -334,7 +362,7 @@ export const NoteEditor: React.FC<NoteEditorProps> = ({
           if (!el.querySelector('.katex')) {
             const latex = el.getAttribute('data-latex') || el.textContent || '';
             const isDisplay = el.tagName === 'DIV' || el.classList.contains('math-block') || el.classList.contains('equation');
-            el.innerHTML = katex.renderToString(latex, { displayMode: isDisplay, throwOnError: false });
+            el.innerHTML = katex.renderToString(latex, { displayMode: isDisplay, throwOnError: false, strict: 'ignore' });
           }
         } catch (e) {
           console.warn('KaTeX explicit rendering error:', e);
