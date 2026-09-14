@@ -3,9 +3,8 @@ import type { NoteSettings, TranscriptEntry } from "../types/notes.js";
 export function buildNotesPrompt(
   videoId: string,
   transcript: TranscriptEntry[],
-  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
+  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined; transcriptText?: string | undefined }
 ): string {
-
 
   const isGeneric =
     !settings.videoTitle ||
@@ -24,14 +23,19 @@ export function buildNotesPrompt(
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const hasTranscript = Array.isArray(transcript) && transcript.length > 0;
-
-  const transcriptSection = hasTranscript
-    ? `Timestamped Transcript (this is the ONLY source of truth for what was taught — do not add facts, examples, code, or claims that aren't grounded in it):\n${transcript
-        .map((entry) => `[${formatOffset(entry.offset)}] ${entry.text}`)
-        .join("\n")}`
-    : `YouTube Video Source: ${watchUrl}\n(Synthesize and ground all notes, code, formulas, and structural diagrams directly from this lecture video: ${watchUrl})`;
+  let transcriptSection = "";
+  if (settings.transcriptText?.trim()) {
+    transcriptSection = `Provided Lecture Transcript (this is the ONLY source of truth for what was taught — ground all notes, definitions, examples, and formulas strictly in this text):\n"""\n${settings.transcriptText.trim()}\n"""`;
+  } else if (Array.isArray(transcript) && transcript.length > 0) {
+    transcriptSection = `Timestamped Transcript (this is the ONLY source of truth for what was taught — do not add facts, examples, code, or claims that aren't grounded in it):\n${transcript
+      .map((entry) => `[${formatOffset(entry.offset)}] ${entry.text}`)
+      .join("\n")}`;
+  } else if (videoId) {
+    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    transcriptSection = `YouTube Video Source: ${watchUrl}\n(Synthesize and ground all notes, code, formulas, and structural diagrams directly from this lecture video: ${watchUrl})`;
+  } else {
+    transcriptSection = "Lecture Material (Synthesize structured academic notes from the provided topics and instructions).";
+  }
 
   const customInstruction = settings.customPrompt?.trim()
     ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`

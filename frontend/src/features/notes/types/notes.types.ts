@@ -38,12 +38,14 @@ export interface Note {
 }
 
 export interface GenerateNotesParams {
-  youtubeUrl: string;
+  youtubeUrl?: string;
+  transcriptText?: string;
   customPrompt?: string;
   customTopic?: string;
   settings?: NoteSettings;
   transcript?: Array<{ text: string; offset?: number }>;
 }
+
 
 export interface NotesState {
   notes: Note[];

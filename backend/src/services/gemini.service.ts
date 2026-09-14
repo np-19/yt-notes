@@ -47,7 +47,7 @@ export async function executeWithModelFallback<T>(
 export async function generateNotes(
   videoId: string,
   transcript: TranscriptEntry[],
-  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
+  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined; transcriptText?: string | undefined }
 ): Promise<string> {
   const prompt = buildNotesPrompt(videoId, transcript, settings);
 
@@ -64,10 +64,11 @@ export async function generateNotes(
 export async function generateNotesStream(
   videoId: string,
   transcript: TranscriptEntry[],
-  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined },
+  settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined; transcriptText?: string | undefined },
   onChunk: (chunkText: string) => void
 ): Promise<string> {
   const prompt = buildNotesPrompt(videoId, transcript, settings);
+
 
   return executeWithModelFallback("generateNotesStream", async (ai, modelName) => {
     const streamingResult = await ai.models.generateContentStream({

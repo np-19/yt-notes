@@ -2,10 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
-import { ExpressError } from "../utils/expressError.js";
 
 const router = Router();
-const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Invalid YouTube video ID");
 
 const settings = z.object({
   detailLevel: z.enum(detailLevels).default("standard"),
@@ -21,12 +19,12 @@ const transcriptEntrySchema = z.object({
 });
 
 const notePayloadSchema = settings.extend({
-  videoId,
+  videoId: z.string().optional().default(""),
   videoTitle: z.string().trim().min(1).max(300).optional(),
   customPrompt: z.string().max(2000).optional(),
+  transcriptText: z.string().optional(),
   transcript: z.array(transcriptEntrySchema).optional().default([]),
 });
-
 
 type NotePayload = z.infer<typeof notePayloadSchema>;
 
@@ -40,14 +38,14 @@ function resolveDocumentTitle(markdown: string, fallbackTitle?: string): string 
 router.post("/", async (req, res, next) => {
   try {
     const body = notePayloadSchema.parse(req.body);
-    const resolvedTitle = body.videoTitle?.trim() || `Lecture Notes — ${body.videoId}`;
+    const resolvedTitle = body.videoTitle?.trim() || (body.videoId ? `Lecture Notes — ${body.videoId}` : "Synthesized Notes");
 
     const markdown = await generateNotes(body.videoId, body.transcript, {
       ...body,
       videoTitle: resolvedTitle,
     });
 
-    const { videoId: _videoId, videoTitle: _vt, transcript: _t, ...noteSettings } = body;
+    const { videoId: _videoId, videoTitle: _vt, transcript: _t, transcriptText: _tt, ...noteSettings } = body;
     const finalTitle = resolveDocumentTitle(markdown, resolvedTitle);
 
     res.json({
@@ -79,7 +77,7 @@ router.post("/stream", async (req, res) => {
     }
 
     const body = parseResult.data;
-    const resolvedTitle = body.videoTitle?.trim() || `Lecture Notes — ${body.videoId}`;
+    const resolvedTitle = body.videoTitle?.trim() || (body.videoId ? `Lecture Notes — ${body.videoId}` : "Synthesized Notes");
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");

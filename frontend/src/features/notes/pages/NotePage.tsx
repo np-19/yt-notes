@@ -50,10 +50,12 @@ export const NotePage: React.FC = () => {
     await notesApi.streamGenerateNotes(
       {
         youtubeUrl: draftData.youtubeUrl,
+        transcriptText: draftData.transcriptText,
         customTopic: draftData.customTopic,
         customPrompt: draftData.customPrompt,
         settings: draftData.settings,
       },
+
       (_chunk, cumulative) => {
         setActiveDocument((prev) => (prev ? { ...prev, htmlContent: cumulative } : prev));
       },

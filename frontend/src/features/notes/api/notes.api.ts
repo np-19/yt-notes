@@ -71,27 +71,24 @@ const examplesMap: Record<string, 'minimal' | 'normal' | 'many'> = {
 };
 
 async function buildNotePayload(params: GenerateNotesParams) {
-  const videoId = extractYouTubeId(params.youtubeUrl);
-  if (!videoId) {
-    throw new Error('Please enter a valid YouTube video URL or 11-character video ID.');
+  const videoId = params.youtubeUrl ? extractYouTubeId(params.youtubeUrl) || '' : '';
+  const transcriptText = params.transcriptText?.trim() || '';
+
+  if (!transcriptText && !params.transcript?.length && !videoId) {
+    throw new Error('Please paste a lecture transcript or enter a topic.');
   }
 
-  let titleCandidate = params.customTopic?.trim() || `Lecture Notes — ${videoId}`;
-
-  // Transcript extracted directly by extension content script (if available)
-  const effectiveTranscript =
-    params.transcript && params.transcript.length > 0
-      ? params.transcript
-      : await fetchBrowserTranscript(videoId);
+  let titleCandidate = params.customTopic?.trim() || (videoId ? `Lecture Notes — ${videoId}` : 'Synthesized Notes');
 
   return {
     videoId,
     titleCandidate,
     payload: {
-      videoId,
+      videoId: videoId || undefined,
       videoTitle: titleCandidate,
+      transcriptText: transcriptText || undefined,
       customPrompt: params.customPrompt || undefined,
-      transcript: effectiveTranscript && effectiveTranscript.length > 0 ? effectiveTranscript : undefined,
+      transcript: params.transcript && params.transcript.length > 0 ? params.transcript : undefined,
       detailLevel: detailLevelMap[params.settings?.detailLevel || 'detailed'] || 'standard',
       diagramDensity: diagramDensityMap[params.settings?.diagramDensity || 'balanced'] || 'balanced',
       examples: examplesMap[params.settings?.examples || 'many'] || 'normal',
@@ -99,8 +96,8 @@ async function buildNotePayload(params: GenerateNotesParams) {
       detailedMath: params.settings?.detailedMath !== false,
     },
   };
-
 }
+
 
 export const notesApi = {
   fetchNotes: async (): Promise<Note[]> => {
