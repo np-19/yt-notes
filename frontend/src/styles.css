@@ -729,16 +729,20 @@ button:disabled {
   box-sizing: border-box;
 }
 
-/* Subheadings (h3) - Themed with 1px border underline */
+/* Subheadings (h3) */
 .note-content h3 {
   color: var(--note-primary, #6a1b9a) !important;
   margin-top: 24px !important;
   padding-bottom: 6px !important;
-  border-bottom: 1px solid var(--note-underline, #d1a3e0) !important;
   font-size: 14.5px !important;
   font-weight: 700 !important;
   break-after: avoid;
   page-break-after: avoid;
+}
+
+/* Hide horizontal dividing rules */
+.note-content hr {
+  display: none !important;
 }
 
 /* Callouts - Muted amber style matching PDF */

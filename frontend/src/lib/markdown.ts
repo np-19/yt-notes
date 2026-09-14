@@ -45,6 +45,9 @@ export function healMarkdownDefects(markdown: string): string {
     return `\`\`\`mermaid\n${fixedLines.join('\n')}\n\`\`\``;
   });
 
+  // 4. Strip unwanted horizontal dividing lines (---, ***, ___)
+  text = text.replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, '');
+
   return text;
 }
 

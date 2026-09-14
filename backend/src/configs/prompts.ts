@@ -180,6 +180,7 @@ ${customInstruction ? `6. USER CUSTOM FOCUS:\n${customInstruction}` : ""}
  
 DOCUMENT STRUCTURE & FORMATTING:
 - OUTPUT FORMAT: Return clean GitHub-Flavored Markdown (GFM) only. Do NOT wrap the entire response in a top-level code block.
+- NO HORIZONTAL DIVIDERS: Do NOT use horizontal divider lines (`---` or `***`) between sections.
 - NO EMOJIS: Use clean typographic symbols only: ✓ for yes/recommended, ✗ for no/avoid, and → for flow arrows.
 - A4 FRONT COVER PAGE: Always begin the document with the exact A4 cover header format below:
   <header class="note-cover">
