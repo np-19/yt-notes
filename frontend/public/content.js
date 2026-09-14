@@ -362,5 +362,10 @@
     }
   }, 1000);
 
+  document.addEventListener("yt-navigate-finish", () => {
+    initExtension();
+  });
+
   initExtension();
 })();
+

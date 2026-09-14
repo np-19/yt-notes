@@ -18,13 +18,20 @@
         } catch {}
       }
 
-      // 3. Check window.ytInitialPlayerResponse
+      // 3. Check ytd-watch-flexy component data
+      const flexy = document.querySelector("ytd-watch-flexy");
+      if (flexy && flexy.playerData?.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
+        const tracks = flexy.playerData.captions.playerCaptionsTracklistRenderer.captionTracks;
+        if (Array.isArray(tracks) && tracks.length > 0) return tracks;
+      }
+
+      // 4. Check window.ytInitialPlayerResponse
       if (window.ytInitialPlayerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks) {
         const tracks = window.ytInitialPlayerResponse.captions.playerCaptionsTracklistRenderer.captionTracks;
         if (Array.isArray(tracks) && tracks.length > 0) return tracks;
       }
 
-      // 4. Scan script tags
+      // 5. Scan script tags
       const scripts = document.querySelectorAll("script");
       for (const s of scripts) {
         const text = s.textContent || "";
@@ -46,19 +53,43 @@
     return [];
   };
 
+  const attemptGetTracks = (videoId, callback, retries = 5) => {
+    const tracks = findCaptionTracks();
+    if (tracks.length > 0 || retries <= 0) {
+      callback(tracks);
+      return;
+    }
+    setTimeout(() => {
+      attemptGetTracks(videoId, callback, retries - 1);
+    }, 600);
+  };
+
   window.addEventListener("message", (e) => {
     if (e.data?.type === "GET_YT_CAPTIONS_TRACK") {
       const videoId = e.data.videoId;
-      const tracks = findCaptionTracks();
+      attemptGetTracks(videoId, (tracks) => {
+        window.postMessage(
+          {
+            type: "YT_CAPTIONS_TRACK_RESPONSE",
+            videoId,
+            tracks: tracks || [],
+          },
+          "*"
+        );
+      });
+    }
+  });
 
-      window.postMessage(
-        {
-          type: "YT_CAPTIONS_TRACK_RESPONSE",
-          videoId,
-          tracks: tracks || [],
-        },
-        "*"
-      );
+  // Listen for YouTube SPA video change
+  document.addEventListener("yt-navigate-finish", () => {
+    const vId = new URL(location.href).searchParams.get("v");
+    if (vId) {
+      setTimeout(() => {
+        const tracks = findCaptionTracks();
+        if (tracks.length > 0) {
+          window.postMessage({ type: "YT_CAPTIONS_TRACK_RESPONSE", videoId: vId, tracks }, "*");
+        }
+      }, 800);
     }
   });
 })();
