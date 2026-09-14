@@ -42,10 +42,17 @@ export function buildNotesPrompt(
     settings.videoTitle.startsWith("YouTube Lecture (");
 
   const lectureTitle = !isGeneric ? settings.videoTitle?.trim() || "" : "";
-  const transcriptSection =
-    transcript && transcript.length > 0
-      ? `Timestamped Transcript:\n${transcript.map((entry) => `[${entry.offset}ms] ${entry.text}`).join("\n")}`
-      : `YouTube Video ID: ${videoId}${lectureTitle ? `\nVideo Title: "${lectureTitle}"` : ""}`;
+
+  const formatOffset = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const transcriptSection = `Timestamped Transcript (this is the ONLY source of truth for what was taught — do not add facts, examples, code, or claims that aren't grounded in it):\n${transcript
+    .map((entry) => `[${formatOffset(entry.offset)}] ${entry.text}`)
+    .join("\n")}`;
 
   const customInstruction = settings.customPrompt?.trim()
     ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`
@@ -60,72 +67,83 @@ export function buildNotesPrompt(
     coverBadge = "Quick Reference • Summary Notes";
     lengthAndDepthInstruction = `
 DETAIL LEVEL: CONCISE SUMMARY / KEY POINTS
-- GOAL: Provide a high-level, fast-to-read summary capturing all key topics, essential definitions, and main takeaways from the entire video.
+- GOAL: Provide a high-level, fast-to-read summary capturing all key topics, essential definitions, and main takeaways ACTUALLY PRESENT in the transcript.
 - APPROACH:
-  - Cover every topic presented in the video, keeping explanations crisp, direct, and focused on core principles.
-  - Break into clear numbered sections matching the video's chapters or topics.
-  - Include essential definitions and a concise summary table or takeaway cheat-sheet.`;
+  - Cover every topic presented in the video, keeping explanations crisp, direct, and focused on core principles the speaker actually covered.
+  - Break into clear numbered sections matching the video's chapters or topics, in the order they appear in the transcript.
+  - Include essential definitions and a concise summary table or takeaway cheat-sheet, drawn only from what was said.`;
   } else if (settings.detailLevel === "deep_dive") {
     coverSubtitle = "Exhaustive Technical Masterclass & Engineering Guide";
     coverBadge = "Exhaustive Deep Dive • Master Study Guide";
     lengthAndDepthInstruction = `
 DETAIL LEVEL: EXHAUSTIVE TECHNICAL MASTERCLASS (DEEP DIVE)
-- GOAL: Produce an exhaustive, publication-grade study guide that documents 100% of the video's content and enriches every concept from first principles to production edge cases.
+- GOAL: Produce an exhaustive, publication-grade study guide that documents 100% of the video's content and clearly distinguishes it from any supplementary context you add.
 
 - STRICT REQUIREMENT: COMPLETE & UNTRUNCATED VIDEO COVERAGE
-  - Follow the video chronologically from beginning to end without skipping, summarizing away, or omitting ANY section, demo, code walkthrough, slide, or speaker explanation.
-  - Retain the author's exact nuances, examples, diagrams, and terminology.
+  - Follow the video chronologically from beginning to end without skipping, summarizing away, or omitting ANY section, demo, code walkthrough, slide, or speaker explanation that appears in the transcript.
+  - Retain the author's exact nuances, examples, diagrams, and terminology as given — do not substitute your own examples for the speaker's.
 
-- LAYERED 4-TIER TECHNICAL DEPTH (Apply to every major concept/topic):
-  1. First Principles & Motivation: What exact problem does this solve? Why was it designed this way? Why do simpler alternative approaches fail?
-  2. Internal Mechanics & Execution Flow: Step-by-step breakdown of how it works under the hood (memory model, OS/runtime behavior, network I/O, state transitions, asymptotic complexity).
-  3. Failure Modes, Gotchas & Anti-Patterns: Real-world edge cases, race conditions, memory leaks, bottlenecks, and common pitfalls under scale.
-  4. Practical Trade-Offs & Decision Rules: Concrete rules of thumb for when to use vs. when to avoid.
+- LAYERED 4-TIER TECHNICAL DEPTH (Apply to every major concept/topic the video actually covers):
+  1. First Principles & Motivation: What exact problem does this solve, as explained (or implied) by the speaker?
+  2. Internal Mechanics & Execution Flow: Step-by-step breakdown of how it works, based on what was shown/said, using standard technical knowledge only to fill in mechanics the speaker referenced but didn't spell out.
+  3. Failure Modes, Gotchas & Anti-Patterns: Real-world edge cases the speaker mentioned; if you add well-known pitfalls beyond what was said, label them clearly per the "Beyond the Video" rule below.
+  4. Practical Trade-Offs & Decision Rules: Rules of thumb grounded in what was demonstrated or stated.
+
+- ENRICHMENT MUST BE LABELED, NEVER BLENDED:
+  - Anything you add that goes beyond what the transcript actually contains (extra context, deeper mechanics, additional pitfalls) must be placed in its own clearly marked callout: \`> **Beyond the Video:** [added context]\`.
+  - Never merge invented specifics into a paragraph so it reads as something the speaker said.
 
 - CODE & WALKTHROUGH RIGOR:
-  - Extract and present full, working code implementations with line-by-line annotations explaining the non-obvious logic.
-  - Where helpful, provide state transition tables or dry-run execution traces.
+  - Extract and present full, working code implementations exactly as shown, with line-by-line annotations explaining the non-obvious logic.
+  - If code shown on screen is partial, cut off, or illegible from the transcript, say so explicitly — do NOT complete or guess the missing lines.
 
 - ARCHITECTURE & VECTOR DIAGRAMS:
-  - Faithfully recreate on-screen diagrams and generate clean Mermaid vector diagrams for complex multi-step workflows, lifecycles, and component architectures (using \`graph TD\`, \`sequenceDiagram\`, or \`stateDiagram-v2\`).
+  - Faithfully recreate on-screen diagrams and generate clean Mermaid vector diagrams for complex multi-step workflows, lifecycles, and component architectures that were actually discussed (using \`graph TD\`, \`sequenceDiagram\`, or \`stateDiagram-v2\`).
 
 - RIGOROUS COMPARISON MATRICES:
-  - Include multi-column comparative tables: (| Solution / Approach | Best Used When | Critical Trade-Offs | Complexity / Overhead | Common Pitfalls |).
+  - Include multi-column comparative tables where the video actually compares approaches: (| Solution / Approach | Best Used When | Critical Trade-Offs | Complexity / Overhead | Common Pitfalls |).
 
 - ACTIVE RECALL & MASTERY SECTION:
-  - Conclude the study guide with 3 to 5 challenging technical/system-design interview questions based on the video's content, followed by clear, concise model solutions.`;
+  - Conclude the study guide with 3 to 5 challenging technical/system-design interview questions based specifically on the video's content, followed by clear, concise model solutions.`;
   } else {
     coverSubtitle = "Complete Lecture Notes & Study Guide";
     coverBadge = "Full Lecture Notes • Study Guide";
     lengthAndDepthInstruction = `
 DETAIL LEVEL: STANDARD DETAILED NOTES
-- GOAL: Produce complete, thorough lecture notes capturing everything taught in the video from start to finish without omitting any topic or concept.
+- GOAL: Produce complete, thorough lecture notes capturing everything actually taught in the video from start to finish without omitting or inventing any topic or concept.
 - APPROACH:
-  - Complete Video Coverage: Document every single topic, slide, whiteboard drawing, code snippet, and explanation presented by the speaker in chronological order.
-  - Structure: Numbered sections and subsections corresponding to every topic and concept in the video.
-  - Content: Provide accurate definitions, recreate on-screen diagrams, document all worked examples, and capture all code blocks discussed.
-  - Conclude with a Summary Cheat-Sheet.`;
+  - Complete Video Coverage: Document every single topic, slide, whiteboard drawing, code snippet, and explanation actually present in the transcript, in chronological order.
+  - Structure: Numbered sections and subsections corresponding to every topic and concept the speaker actually covers.
+  - Content: Provide accurate definitions, recreate on-screen diagrams that are referenced, document all worked examples, and capture all code blocks discussed.
+  - Conclude with a Summary Cheat-Sheet built only from covered material.`;
   }
 
   let diagramInstruction = "";
   if (settings.diagramDensity === "minimal") {
     diagramInstruction = "- DIAGRAM DENSITY: Minimal. Recreate only the diagrams and visual structures directly drawn or displayed on screen in the video.";
   } else if (settings.diagramDensity === "aggressive") {
-    diagramInstruction = "- DIAGRAM DENSITY: Heavy. Recreate all on-screen diagrams in detail AND convert all multi-step workflows, lifecycles, and architectures mentioned into Mermaid diagrams (3 to 5 diagrams total).";
+    diagramInstruction = "- DIAGRAM DENSITY: Heavy. Recreate all on-screen diagrams in detail AND convert all multi-step workflows, lifecycles, and architectures actually mentioned into Mermaid diagrams (3 to 5 diagrams total).";
   } else {
-    diagramInstruction = "- DIAGRAM DENSITY: Balanced. Recreate on-screen diagrams and include 1 to 2 clear Mermaid vector diagrams where they provide strong visual clarity.";
+    diagramInstruction = "- DIAGRAM DENSITY: Balanced. Recreate on-screen diagrams and include 1 to 2 clear Mermaid vector diagrams where they provide strong visual clarity for workflows the video actually describes.";
   }
 
   let examplesInstruction = "";
   if (settings.examples === "minimal") {
     examplesInstruction = "- EXAMPLES: Concise. State the rules and concepts directly without long narrative examples.";
   } else if (settings.examples === "many") {
-    examplesInstruction = "- EXAMPLES: Many. Capture every real-world example, scenario, code walkthrough, and edge case mentioned by the speaker.";
+    examplesInstruction = "- EXAMPLES: Many. Capture every real-world example, scenario, code walkthrough, and edge case the speaker actually mentioned.";
   } else {
-    examplesInstruction = "- EXAMPLES: Balanced. Capture the primary real-world example and analogy the speaker used to explain each concept.";
+    examplesInstruction = "- EXAMPLES: Balanced. Capture the primary real-world example and analogy the speaker actually used to explain each concept.";
   }
 
   return `You are generating structured, highly readable technical notes from a video lecture.
+
+GROUNDING & ANTI-HALLUCINATION RULES (highest priority — read first):
+- Your only source of truth is the transcript provided below (or, if none was provided, the notice explaining that). Every specific claim, fact, example, code snippet, number, or quote in your notes must trace back to something actually present in that source.
+- Do NOT invent plausible-sounding details (extra examples, extra code, extra statistics, extra diagrams) and present them as if the speaker said or showed them. If you add outside context to deepen an explanation, mark it clearly as such (see "Beyond the Video" callouts below) — never blend it in as if it were spoken content.
+- If a section of the transcript is unclear, garbled, or ambiguous, say so plainly rather than guessing and presenting the guess as fact.
+- Tag each major numbered section with the timestamp(s) from the transcript it's drawn from, e.g. "## 2. Database Indexing [14:22]", so the notes stay traceable to a specific moment in the video.
+- Preserve the speaker's own terminology, examples, and code exactly as given rather than substituting your own generic versions.
 
 ${lengthAndDepthInstruction}
 
@@ -133,13 +151,14 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
 
 1. FAITHFUL TO THE VIDEO CONTENT & FLOW:
    - Capture what was actually taught, written on screen (slides, whiteboard, diagrams, code), and explained by the speaker.
-   - Follow the chronological sequence and topic progression of the video.
+   - Follow the chronological sequence and topic progression of the video as given by the transcript order.
    - Do NOT replace the speaker's practical developer explanations with artificial, overly dense academic jargon. Keep the language natural, clear, and direct.
 
 2. ACCURATE DEFINITIONS & FACT CORRECTION:
    - Provide standard, technically accurate definitions for all concepts introduced in the video.
    - FACT CHECKING: If the speaker misstates a fact, makes a technical slip-up, or teaches an outdated/incorrect definition, state the correct standard fact in the notes and add a clear callout:
      > **Technical Note / Correction:** [Briefly clarify the accurate standard definition or industry best practice]
+   - Only add a correction when the transcript actually contains the misstatement — don't invent slip-ups to fill space.
 
 3. VISUALS & ON-SCREEN DIAGRAMS (STRICT MERMAID RULES):
    ${diagramInstruction}
@@ -153,7 +172,7 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
      d. In \`sequenceDiagram\`, wrap labels in quotes: \`Client->>Server: "POST /auth/login (JWT)"\`.
 
 4. CODE SNIPPETS & EXAMPLES:
-   ${settings.includeCode ? "- Extract and format code snippets shown on screen using syntax-highlighted code blocks (```python, ```typescript, ```java, ```sql, etc.)." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points."}
+   ${settings.includeCode ? "- Extract and format code snippets shown on screen exactly as given, using syntax-highlighted code blocks (```python, ```typescript, ```java, ```sql, etc.). If a snippet is incomplete in the transcript, mark it as incomplete rather than filling in the missing parts." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points, based only on what was actually explained."}
    ${examplesInstruction}
 
 5. MATH, FORMULAS & CODE FORMATTING RULES (STRICT LATEX RULES):
@@ -173,19 +192,20 @@ DOCUMENT STRUCTURE & FORMATTING:
   <header class="note-cover">
     <h1>${lectureTitle || "[Determine and insert the exact specific title of this video here]"}</h1>
     <p class="subtitle">${coverSubtitle}</p>
-    <p class="description">[Write 2-3 clear, informative sentences summarizing the core topics, mechanisms, and key takeaways covered in this lecture]</p>
+    <p class="description">[Write 2-3 clear, informative sentences summarizing the core topics, mechanisms, and key takeaways ACTUALLY covered in this lecture — not inferred or invented]</p>
     <div class="badge-pill">${coverBadge}</div>
   </header>
-- NUMBERED HEADINGS:
-  ## 1. [Major Topic Title]
-  ### 1.1 [Subtopic Title]
+- NUMBERED HEADINGS WITH TIMESTAMPS:
+  ## 1. [Major Topic Title] [mm:ss]
+  ### 1.1 [Subtopic Title] [mm:ss]
 - CALLOUT BLOCKS: Use standard blockquotes for important takeaways:
-  > **Key Takeaway:** [Core insight or principle]
-  > **Example / Analogy:** [Real-world analogy or walkthrough from the video]
-  > **Important Warning:** [Common pitfalls or edge cases discussed]
-  > **Technical Note / Correction:** [Use when clarifying or correcting a slip-up in the lecture]
-- COMPARISON TABLES: Clean Markdown tables (| Feature / Option | When to Use | Advantages | Limitations |).
-- SUMMARY CHEAT-SHEET: Conclude with a summary section containing a quick reference table and key takeaways.
+  > **Key Takeaway:** [Core insight or principle actually stated]
+  > **Example / Analogy:** [Real-world analogy or walkthrough actually used in the video]
+  > **Important Warning:** [Common pitfalls or edge cases actually discussed]
+  > **Technical Note / Correction:** [Use only when clarifying an actual slip-up in the lecture]
+  > **Beyond the Video:** [Use only for context you've added that goes beyond what was actually said/shown]
+- COMPARISON TABLES: Clean Markdown tables (| Feature / Option | When to Use | Advantages | Limitations |), populated only with comparisons the video actually makes.
+- SUMMARY CHEAT-SHEET: Conclude with a summary section containing a quick reference table and key takeaways drawn only from covered material.
 
 ${transcriptSection}
 `;

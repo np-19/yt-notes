@@ -47,7 +47,6 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
 };
 app.use(errorHandler);
 
-// In local/standalone environment, listen on the configured port. On Vercel, the app is exported as a serverless handler.
 if (!process.env.VERCEL) {
   app.listen(Port, () => console.log(`LectureNotes AI backend listening on port ${Port}`));
 }

@@ -51,7 +51,7 @@ export async function generateNotes(
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
 ): Promise<string> {
   if (!transcript || transcript.length === 0) {
-    throw new ExpressError("A transcript is required to synthesize lecture notes. No transcript data was provided.", 400);
+    throw new ExpressError("Transcript unavailable for this video — captions may be disabled or the video may be restricted.", 400);
   }
 
   const prompt = buildNotesPrompt(videoId, transcript, settings);
@@ -73,7 +73,7 @@ export async function generateNotesStream(
   onChunk: (chunkText: string) => void
 ): Promise<string> {
   if (!transcript || transcript.length === 0) {
-    throw new ExpressError("A transcript is required to synthesize lecture notes. No transcript data was provided.", 400);
+    throw new ExpressError("Transcript unavailable for this video — captions may be disabled or the video may be restricted.", 400);
   }
 
   const prompt = buildNotesPrompt(videoId, transcript, settings);

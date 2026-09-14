@@ -34,7 +34,7 @@ async function prepareSynthesisContext(body: NotePayload) {
   let transcript = body.transcript || [];
   let resolvedTitle = body.videoTitle?.trim();
 
-  // If transcript was not supplied by client extension, fetch it from youtube-transcript.io
+  // If transcript was not supplied by client extension, fetch/generate it via Gemini
   if (transcript.length === 0) {
     const details = await getVideoDetailsAndTranscript(body.videoId);
     transcript = details.transcript;
@@ -45,7 +45,7 @@ async function prepareSynthesisContext(body: NotePayload) {
 
   if (transcript.length === 0) {
     throw new ExpressError(
-      "Could not retrieve or generate transcript for this YouTube video. Please ensure the video is accessible and try again.",
+      "Transcript unavailable for this video — captions may be disabled or the video may be restricted.",
       400
     );
   }
