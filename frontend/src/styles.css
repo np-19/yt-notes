@@ -819,20 +819,35 @@ button:disabled {
   background: #f9fafb;
 }
 
-/* Code & Pills */
+/* Code & Pills - Fixed width with wrapped code lines */
 .note-content pre {
   background: #2d2d2d !important;
   color: #f3f4f6 !important;
   padding: 14px 18px;
-  overflow-x: auto;
   border-radius: 6px;
   font-family: 'DM Mono', monospace;
   font-size: 12px;
   line-height: 1.6;
   margin: 16px 0;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  overflow-x: hidden !important;
+}
+.note-content pre code {
+  font-family: 'DM Mono', monospace;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  display: block;
+  width: 100%;
 }
 .note-content code {
   font-family: 'DM Mono', monospace;
+  word-break: break-word;
 }
 .note-content code.pill,
 .note-content .pill {
