@@ -113,11 +113,11 @@ DETAIL LEVEL: STANDARD DETAILED NOTES
 
   let diagramInstruction = "";
   if (settings.diagramDensity === "minimal") {
-    diagramInstruction = "- DIAGRAM DENSITY: Minimal. Recreate only the diagrams and visual structures directly drawn or displayed on screen in the video.";
+    diagramInstruction = "- DIAGRAM DENSITY: Minimal. Convert every diagram or visual structure directly drawn or displayed on screen into a Mermaid block — none may be skipped or left as plain prose. Do not add Mermaid diagrams for workflows that were only described verbally with nothing shown on screen.";
   } else if (settings.diagramDensity === "aggressive") {
-    diagramInstruction = "- DIAGRAM DENSITY: Heavy. Recreate all on-screen diagrams in detail AND convert all multi-step workflows, lifecycles, and architectures actually mentioned into Mermaid diagrams (3 to 5 diagrams total).";
+    diagramInstruction = "- DIAGRAM DENSITY: Heavy. Convert every on-screen diagram AND every multi-step workflow, lifecycle, or architecture the speaker describes verbally — however many there are — into its own Mermaid diagram. There is NO cap on the count: if the video covers 8 distinct flows, produce 8 diagrams, not 3-5. Never fold two unrelated flows into a single diagram just to keep the count down, and never omit a diagram because a similar one already appeared earlier.";
   } else {
-    diagramInstruction = "- DIAGRAM DENSITY: Balanced. Recreate on-screen diagrams and include 1 to 2 clear Mermaid vector diagrams where they provide strong visual clarity for workflows the video actually describes.";
+    diagramInstruction = "- DIAGRAM DENSITY: Balanced. Convert every on-screen diagram into Mermaid, AND convert every multi-step workflow, lifecycle, or architecture the video describes into Mermaid whenever the sequence or branching would be lost in plain prose — this is a coverage requirement, not a stylistic nice-to-have. The only workflows that may stay as bullets are truly flat, non-branching step lists with no diagram value.";
   }
 
   let examplesInstruction = "";
@@ -155,7 +155,7 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
  
 3. VISUALS & ON-SCREEN DIAGRAMS (STRICT MERMAID RULES):
    ${diagramInstruction}
-   - When diagrams appear on screen (e.g., flowcharts, architecture maps, sequence flows, state machines), recreate them faithfully using \`\`\`mermaid code blocks.
+   - When diagrams appear on screen (e.g., flowcharts, architecture maps, sequence flows, state machines), recreate them faithfully using \`\`\`mermaid code blocks. This is mandatory for every qualifying diagram under the density setting above — do NOT describe a diagram in a paragraph or bullet list and then skip building the actual Mermaid block for it. Before finishing the notes, scan back through the transcript once for any flowchart, architecture, sequence, or state-machine content you described in prose but never rendered as Mermaid, and convert it.
    - MANDATORY MERMAID SYNTAX RULES (To prevent syntax crashes):
      a. ALWAYS double-quote EVERY node label containing spaces, colons, parentheses, brackets, or slashes:
         ✓ DO: \`A["Client (React App)"] --> B["API Gateway: 8080"]\`
@@ -165,11 +165,11 @@ CRITICAL NOTE-TAKING & ACCURACY RULES:
      d. In \`sequenceDiagram\`, wrap labels in quotes: \`Client->>Server: "POST /auth/login (JWT)"\`.
  
 4. CODE SNIPPETS & EXAMPLES:
-   ${settings.includeCode ? "- Extract and format code snippets shown on screen exactly as given, using syntax-highlighted code blocks (```python, ```typescript, ```java, ```sql, etc.). If a snippet is incomplete in the transcript, mark it as incomplete rather than filling in the missing parts." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points, based only on what was actually explained."}
+   ${settings.includeCode ? "- Extract and format code snippets shown on screen exactly as given, using syntax-highlighted code blocks. For every code block, first identify the actual language/format from context (syntax, file extension mentioned, imports, shell prompt, the speaker naming it, etc.) and tag the fence with that specific language identifier — ```python, ```typescript, ```java, ```sql, ```bash, ```json, ```yaml, ```html, ```css, and so on. NEVER use a bare ``` fence or a generic ```text/```code tag when the language is identifiable from the transcript; only fall back to a plain fence if the snippet is genuinely language-agnostic pseudocode. If a single walkthrough mixes languages (e.g. a shell command then a Python file), give each its own correctly-tagged fence rather than one mixed block. If a snippet is incomplete in the transcript, mark it as incomplete rather than filling in the missing parts." : "- Omit code blocks; describe algorithmic and programmatic logic conceptually in bullet points, based only on what was actually explained."}
    ${examplesInstruction}
  
 5. MATH, FORMULAS & CODE FORMATTING RULES (STRICT LATEX RULES):
-   ${settings.detailedMath ? "- Use LaTeX ($$ ... $$ for display math, $...$ for inline math) ONLY for pure mathematical equations, arithmetic proofs, probability, and Big-O asymptotic notation (e.g., $O(N \\log N)$, $T(n) = 2T(n/2) + O(n)$)." : "- Keep mathematical and complexity notations simple and inline."}
+   ${settings.detailedMath ? "- Use LaTeX ($$ ... $$ for display math, $...$ for inline math) for EVERY pure mathematical equation, arithmetic proof, probability expression, and Big-O asymptotic notation that appears in the transcript (e.g., $O(N \\log N)$, $T(n) = 2T(n/2) + O(n)$) — apply this consistently across the whole document, not just the first occurrence; don't leave some equations in LaTeX and others as plain text." : "- Do NOT use LaTeX ($ or $$) anywhere in this document. Write all math and complexity notation as plain inline text using standard characters and Unicode symbols instead: exponents/subscripts spelled out or written with ^ and _ (e.g. `O(n log n)`, `T(n) = 2T(n/2) + O(n)`, `x^2 + y^2`), and symbols like ×, ÷, ≤, ≥, ≈, √ where natural. Apply this same plain-text style everywhere math appears in the document — never mix in a stray $...$ block."}
    - ABSOLUTE PROHIBITION: NEVER put SQL queries, database schema statements, API endpoints, variable names, or programming code inside LaTeX math ($$ or $). Format SQL/code strictly as inline backticks (\`SELECT * FROM ...\`) or syntax-highlighted code blocks (\`\`\`sql ... \`\`\`).
    - LATEX ESCAPING RULES:
      a. In LaTeX math, all literal underscores must be escaped as \\_ (e.g. \$\\text{max\\_connections}\$).
