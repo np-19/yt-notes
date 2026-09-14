@@ -740,6 +740,38 @@ button:disabled {
   page-break-after: avoid;
 }
 
+/* Category Subheadings (h4, h5, h6) */
+.note-content h4 {
+  color: #111827 !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  margin-top: 18px !important;
+  margin-bottom: 6px !important;
+  line-height: 1.4 !important;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.note-content h5 {
+  color: #374151 !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  margin-top: 14px !important;
+  margin-bottom: 4px !important;
+  line-height: 1.4 !important;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+.note-content h6 {
+  color: #4b5563 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  margin-top: 12px !important;
+  margin-bottom: 4px !important;
+  line-height: 1.4 !important;
+}
+
 /* Hide horizontal dividing rules */
 .note-content hr {
   display: none !important;
@@ -1182,9 +1214,28 @@ footer {
     margin-bottom: 7pt !important;
     font-size: 11pt !important;
     color: var(--note-primary, #6a1b9a) !important;
-    border-bottom: 1px solid var(--note-underline, #d1a3e0) !important;
-    padding-bottom: 4pt !important;
+    padding-bottom: 3pt !important;
     padding-left: 2pt !important;
+  }
+  .note-content h4,
+  h4 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    margin-top: 12pt !important;
+    margin-bottom: 4pt !important;
+    font-size: 10pt !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+  }
+  .note-content h5,
+  h5 {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+    margin-top: 10pt !important;
+    margin-bottom: 3pt !important;
+    font-size: 9pt !important;
+    font-weight: 700 !important;
+    color: #374151 !important;
   }
   .callout, table, pre, .flow-diagram, .mermaid, .grid-2 {
     break-inside: avoid !important;
