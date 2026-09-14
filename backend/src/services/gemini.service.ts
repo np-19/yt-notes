@@ -50,25 +50,16 @@ export async function generateNotes(
   transcript: TranscriptEntry[],
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined }
 ): Promise<string> {
-  const prompt = buildNotesPrompt(videoId, transcript, settings);
-  const contents: any[] = [];
-
-  // Path 1: If client didn't supply transcript, feed YouTube video directly to Gemini
   if (!transcript || transcript.length === 0) {
-    contents.push({
-      fileData: {
-        fileUri: `https://www.youtube.com/watch?v=${videoId}`,
-        mimeType: "video/mp4",
-      },
-    });
+    throw new ExpressError("A transcript is required to synthesize lecture notes. No transcript data was provided.", 400);
   }
-  // Path 2: Feed the prompt (with transcript timestamps if supplied by client)
-  contents.push(prompt);
+
+  const prompt = buildNotesPrompt(videoId, transcript, settings);
 
   return executeWithModelFallback("generateNotes", async (ai, modelName) => {
     const result = await ai.models.generateContent({
       model: modelName,
-      contents,
+      contents: prompt,
     });
     const text = result.text;
     return text && text.trim().length > 0 ? text : null;
@@ -81,25 +72,16 @@ export async function generateNotesStream(
   settings: NoteSettings & { videoTitle?: string | undefined; customPrompt?: string | undefined },
   onChunk: (chunkText: string) => void
 ): Promise<string> {
-  const prompt = buildNotesPrompt(videoId, transcript, settings);
-  const contents: any[] = [];
-
-  // Path 1: If client didn't supply transcript, feed YouTube video directly to Gemini
   if (!transcript || transcript.length === 0) {
-    contents.push({
-      fileData: {
-        fileUri: `https://www.youtube.com/watch?v=${videoId}`,
-        mimeType: "video/mp4",
-      },
-    });
+    throw new ExpressError("A transcript is required to synthesize lecture notes. No transcript data was provided.", 400);
   }
-  // Path 2: Feed the prompt (with transcript timestamps if supplied by client)
-  contents.push(prompt);
+
+  const prompt = buildNotesPrompt(videoId, transcript, settings);
 
   return executeWithModelFallback("generateNotesStream", async (ai, modelName) => {
     const streamingResult = await ai.models.generateContentStream({
       model: modelName,
-      contents,
+      contents: prompt,
     });
     let fullText = "";
     for await (const chunk of streamingResult) {

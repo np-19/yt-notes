@@ -3,6 +3,7 @@ import { z } from "zod";
 import { fetchOEmbedDetails, getVideoDetailsAndTranscript } from "../services/yt.transcript.js";
 import { editNotes, generateNotes, generateNotesStream } from "../services/gemini.service.js";
 import { detailLevels, diagramDensities, exampleDensities } from "../types/notes.js";
+import { ExpressError } from "../utils/expressError.js";
 
 const router = Router();
 const videoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/, "Invalid YouTube video ID");
@@ -30,8 +31,24 @@ const notePayloadSchema = settings.extend({
 type NotePayload = z.infer<typeof notePayloadSchema>;
 
 async function prepareSynthesisContext(body: NotePayload) {
-  const transcript = body.transcript || [];
+  let transcript = body.transcript || [];
   let resolvedTitle = body.videoTitle?.trim();
+
+  // If transcript was not supplied by client extension, fetch it from youtube-transcript.io
+  if (transcript.length === 0) {
+    const details = await getVideoDetailsAndTranscript(body.videoId);
+    transcript = details.transcript;
+    if (!resolvedTitle || resolvedTitle.startsWith("Lecture Notes —")) {
+      resolvedTitle = details.title;
+    }
+  }
+
+  if (transcript.length === 0) {
+    throw new ExpressError(
+      "Could not retrieve transcript for this YouTube video. Please ensure the video has subtitles/transcripts enabled and that your YOUTUBE_TRANSCRIPT_API_KEYS are configured with active credits.",
+      400
+    );
+  }
 
   const isGenericTitle =
     !resolvedTitle ||

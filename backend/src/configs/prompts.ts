@@ -1,31 +1,6 @@
 import type { NoteSettings } from "../types/notes.js";
 import type { TranscriptEntry } from "../services/yt.transcript.js";
 
-export function buildTranscriptPrompt(videoId: string): string {
-  return `You are a YouTube video transcription and metadata extraction engine.
-YouTube Video ID: "${videoId}"
-
-Tasks:
-1. Determine the exact Title and Channel/Author name for this video ID.
-2. Extract or generate the COMPLETE, FULL transcript of the entire video from start to finish.
-
-Transcript Rules:
-- If official subtitles/closed captions exist, return them VERBATIM and IN FULL. Do NOT summarize, paraphrase, or skip any part.
-- If no subtitles exist, transcribe the entire video word-for-word from beginning to end.
-- Cover the ENTIRE duration — first second to last. Do NOT truncate or stop early.
-- Combine nearby sentences into longer segments of ~30-60 seconds each. Each "text" field should contain multiple sentences — a full paragraph of speech. This reduces the number of JSON objects.
-- Only include "text" (the spoken words) and "offset" (milliseconds from video start) per entry. No other fields.
-
-Output STRICTLY as raw JSON, no markdown fences:
-{
-  "title": "exact video title",
-  "author": "exact channel name",
-  "hasSubtitles": true,
-  "transcript": [
-    { "text": "A longer paragraph of spoken content covering ~30-60 seconds...", "offset": 0 }
-  ]
-}`;
-}
 
 export function buildNotesPrompt(
   videoId: string,
@@ -43,7 +18,7 @@ export function buildNotesPrompt(
   const transcriptSection =
     transcript && transcript.length > 0
       ? `Timestamped Transcript:\n${transcript.map((entry) => `[${entry.offset}ms] ${entry.text}`).join("\n")}`
-      : `YouTube Video ID: ${videoId}${lectureTitle ? `\nVideo Title: "${lectureTitle}"` : ""}.\nNote: Ingest and take faithful, structured technical notes covering this video. Capture on-screen slides, diagrams, code, and speaker explanations accurately.`;
+      : `YouTube Video ID: ${videoId}${lectureTitle ? `\nVideo Title: "${lectureTitle}"` : ""}`;
 
   const customInstruction = settings.customPrompt?.trim()
     ? `\nSpecific User Custom Focus:\n"${settings.customPrompt.trim()}"\n`
